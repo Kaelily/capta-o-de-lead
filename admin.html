@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AzurraERP — Painel de Gerenciamento do Stand | Feira FRESQUA</title>
+  <meta name="description" content="Painel Interno de Gerenciamento de Leads do Stand AzurraERP na FRESQUA.">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- QRCode Library for QR Modal -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header / Nav (Exclusivo da Equipe AzurraERP) -->
+    <header class="app-header">
+      <a href="admin.html" class="brand-logo">
+        <div class="logo-icon">A</div>
+        <div class="logo-text">AzurraERP</div>
+        <span class="logo-tag" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+          🔒 PAINEL DO STAND
+        </span>
+      </a>
+
+      <div class="nav-actions">
+        <!-- Layout Switcher Button -->
+        <button class="btn-nav btn-theme-toggle" id="btn-toggle-layout" title="Alternar entre Layout SaaS Dark e Layout Totem Tablet/Mobile">
+          🎨 Layout: <span id="layout-name-text">SaaS Dark</span>
+        </button>
+
+        <button class="btn-nav" id="btn-show-qr">
+          📱 Gerar QR Code do Cliente
+        </button>
+        <button id="btn-export-csv" class="btn-nav btn-accent">
+          📥 Exportar Leads (CSV)
+        </button>
+        <a href="index.html" target="_blank" class="btn-nav" style="text-decoration: none;">
+          👁️ Ver Tela do Cliente
+        </a>
+      </div>
+    </header>
+
+    <!-- Admin / Stand Team Dashboard View -->
+    <main id="dashboard-view" class="dashboard-view" style="display: block;">
+      <div class="dashboard-header">
+        <div>
+          <h2 style="font-size: 1.85rem; font-weight: 800;">Painel de Gerenciamento — Stand AzurraERP</h2>
+          <p style="color: var(--text-secondary); font-size: 0.95rem;">Acompanhamento de leads capturados em tempo real na Feira FRESQUA.</p>
+        </div>
+      </div>
+
+      <!-- Metrics Row -->
+      <div class="metrics-bar">
+        <div class="metric-card">
+          <div class="metric-title">Total Leads Capturados</div>
+          <div id="metric-total-leads" class="metric-val">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">🔥 Leads VIP / HOT</div>
+          <div id="metric-hot-leads" class="metric-val" style="color: var(--status-hot);">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">Score Médio de Gestão</div>
+          <div id="metric-avg-score" class="metric-val" style="color: var(--accent-cyan);">0%</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">Perda Média Identificada</div>
+          <div id="metric-total-loss" class="metric-val" style="color: var(--status-warm);">R$ 0</div>
+        </div>
+      </div>
+
+      <!-- Search & Filters -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; gap: 1rem; flex-wrap: wrap;">
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn-nav btn-filter-status active" data-status="all">Todos</button>
+          <button class="btn-nav btn-filter-status" data-status="hot">🔥 HOT / VIP</button>
+          <button class="btn-nav btn-filter-status" data-status="warm">⚡ WARM</button>
+          <button class="btn-nav btn-filter-status" data-status="cold">🌱 COLD</button>
+        </div>
+
+        <input type="text" id="input-search-lead" class="form-input" placeholder="🔍 Buscar por nome, empresa ou zap..." style="max-width: 320px; padding: 0.5rem 1rem;">
+      </div>
+
+      <!-- Leads Table -->
+      <div class="table-wrapper">
+        <table class="lead-table">
+          <thead>
+            <tr>
+              <th>Contato / Nome</th>
+              <th>Empresa / Segmento</th>
+              <th>Faturamento</th>
+              <th>Score</th>
+              <th>Status</th>
+              <th>Capturado</th>
+              <th>Ação Imediata</th>
+            </tr>
+          </thead>
+          <tbody id="lead-table-body">
+            <!-- Dynamic Lead Rows Inserted by JS -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- QR Code Modal (para a equipe exibir no totem ou monitor para os clientes escanearem) -->
+  <div id="qr-modal" class="modal-overlay">
+    <div class="modal-container">
+      <button id="btn-close-qr-modal" class="modal-close">✕</button>
+      <h3 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 0.5rem;">QR Code do Cliente</h3>
+      <p style="color: var(--text-secondary); font-size: 0.9rem;">Exiba este QR Code no stand para o visitante escanear e abrir o Diagnóstico no celular dele:</p>
+      
+      <div class="qr-placeholder" id="qr-code-container" style="background: #ffffff; padding: 1rem; border-radius: 12px; display: inline-block; margin: 1rem 0;">
+        <img id="qr-code-img" src="" alt="QR Code Escaneável AzurraERP" style="width: 220px; height: 220px; display: block; border: none; outline: none;">
+      </div>
+
+      <div style="margin-top: 0.5rem;">
+        <label class="form-label" style="font-size: 0.8rem; margin-bottom: 0.3rem;">Link do Diagnóstico do Cliente (URL):</label>
+        <input type="text" id="input-qr-url" class="form-input" style="font-size: 0.85rem; padding: 0.5rem 0.8rem; text-align: center; color: var(--accent-cyan);" value="">
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/storage.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
