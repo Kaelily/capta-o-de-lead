@@ -1,6 +1,8 @@
 /**
- * AzurraERP Lead Capture - LocalStorage & Lead Management System
+ * AzurraERP Lead Capture - LocalStorage & Cloud Database (Supabase) Sync System
  */
+
+import { CLOUD_CONFIG } from './config.js';
 
 const STORAGE_KEY = 'azurra_fresqua_leads_v1';
 export const COMPANY_WHATSAPP_NUMBER = '551131817744'; // AzurraERP Official WhatsApp (+55 11 3181-7744)
@@ -68,8 +70,32 @@ const sampleLeads = [
   }
 ];
 
+let _supabaseInstance = null;
+
 export const StorageManager = {
-  // Get all leads from LocalStorage (or initialize with realistic sample data)
+  // Obter cliente do Supabase
+  getSupabase() {
+    if (_supabaseInstance) return _supabaseInstance;
+    if (window.supabase && CLOUD_CONFIG.isConfigured()) {
+      try {
+        _supabaseInstance = window.supabase.createClient(
+          CLOUD_CONFIG.supabaseUrl,
+          CLOUD_CONFIG.supabaseAnonKey
+        );
+        return _supabaseInstance;
+      } catch (err) {
+        console.warn('Erro ao inicializar Supabase:', err);
+      }
+    }
+    return null;
+  },
+
+  // Retorna se a nuvem está ativa
+  isCloudActive() {
+    return Boolean(this.getSupabase());
+  },
+
+  // Get all leads from LocalStorage (or initialize with sample data)
   getLeads() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -84,17 +110,146 @@ export const StorageManager = {
     }
   },
 
-  // Save full lead array
+  // Save full lead array to LocalStorage
   saveLeads(leads) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
   },
 
-  // Add new lead
-  addLead(leadData) {
+  // Add new lead (Saves locally AND in Cloud)
+  async addLead(leadData) {
+    // 1. Salva localmente primeiro (garantia offline imediata)
     const leads = this.getLeads();
-    leads.unshift(leadData); // put latest on top
-    this.saveLeads(leads);
+    // Evita duplicatas por id
+    const filtered = leads.filter(l => l.id !== leadData.id);
+    filtered.unshift(leadData);
+    this.saveLeads(filtered);
+
+    // 2. Se a nuvem estiver ativa, envia para o Supabase
+    const supabase = this.getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase.from('leads').upsert([leadData]);
+        if (error) {
+          console.error('Erro ao enviar lead para Supabase:', error);
+        } else {
+          console.log('✅ Lead sincronizado com a nuvem (Supabase):', leadData.id);
+        }
+      } catch (err) {
+        console.error('Falha de rede ao salvar no Supabase:', err);
+      }
+    }
+
     return leadData;
+  },
+
+  // Buscar todos os leads da nuvem e atualizar o cache local
+  async fetchCloudLeads() {
+    const supabase = this.getSupabase();
+    if (!supabase) return this.getLeads();
+
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        console.warn('Erro ao buscar leads da nuvem:', error);
+        return this.getLeads();
+      }
+
+      if (data && data.length > 0) {
+        // Mesclar dados da nuvem com locais sem perder nada
+        const localLeads = this.getLeads();
+        const localMap = new Map(localLeads.map(l => [l.id, l]));
+
+        data.forEach(cloudLead => {
+          localMap.set(cloudLead.id, cloudLead);
+        });
+
+        const merged = Array.from(localMap.values()).sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
+        this.saveLeads(merged);
+        return merged;
+      }
+    } catch (err) {
+      console.warn('Falha ao conectar com nuvem:', err);
+    }
+
+    return this.getLeads();
+  },
+
+  // Ouvir leads em TEMPO REAL (quando alguém envia pelo celular, notifica na hora)
+  subscribeToLeads(onNewLead) {
+    const supabase = this.getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const channel = supabase
+        .channel('realtime_leads')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'leads' },
+          (payload) => {
+            console.log('⚡ Novo lead recebido em tempo real:', payload.new);
+            if (payload.new) {
+              const leads = this.getLeads();
+              const exists = leads.some(l => l.id === payload.new.id);
+              if (!exists) {
+                leads.unshift(payload.new);
+                this.saveLeads(leads);
+              }
+              if (typeof onNewLead === 'function') {
+                onNewLead(payload.new);
+              }
+            }
+          }
+        )
+        .subscribe();
+
+      return channel;
+    } catch (err) {
+      console.error('Erro ao subscrever canais em tempo real:', err);
+      return null;
+    }
+  },
+
+  // Testar se as credenciais do Supabase funcionam
+  async testCloudConnection(url, key) {
+    if (!window.supabase) {
+      return { success: false, message: 'Biblioteca Supabase não carregada.' };
+    }
+    try {
+      const client = window.supabase.createClient(url.trim(), key.trim());
+      const { data, error } = await client.from('leads').select('id').limit(1);
+      if (error) {
+        // Se der erro de tabela não existente
+        if (error.code === '42P01') {
+          return {
+            success: false,
+            message: 'Conectou ao Supabase, mas a tabela "leads" ainda não foi criada. Crie a tabela no SQL Editor.'
+          };
+        }
+        return { success: false, message: `Erro do Supabase: ${error.message}` };
+      }
+      return { success: true, message: 'Conexão com a Nuvem estabelecida com sucesso!' };
+    } catch (err) {
+      return { success: false, message: `Erro ao testar conexão: ${err.message}` };
+    }
+  },
+
+  // Sincronizar todos os leads locais para a nuvem de uma vez
+  async syncLocalToCloud() {
+    const supabase = this.getSupabase();
+    if (!supabase) throw new Error('Nuvem não configurada.');
+    const leads = this.getLeads();
+    if (!leads || leads.length === 0) return 0;
+
+    const { error } = await supabase.from('leads').upsert(leads);
+    if (error) throw error;
+    return leads.length;
   },
 
   // Clear all leads (reset)

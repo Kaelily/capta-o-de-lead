@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="css/styles.css">
   <!-- QRCode Library for QR Modal -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Supabase Cloud Sync SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -23,6 +25,11 @@
       </a>
 
       <div class="nav-actions">
+        <!-- Cloud Sync Status / Config Button -->
+        <button class="btn-nav" id="btn-cloud-config" title="Configurar Sincronização em Nuvem (GitHub/Supabase)">
+          <span id="cloud-status-indicator">🟡</span> Nuvem: <span id="cloud-status-text">Modo Local</span>
+        </button>
+
         <!-- Layout Switcher Button -->
         <button class="btn-nav btn-theme-toggle" id="btn-toggle-layout" title="Alternar entre Layout SaaS Dark e Layout Totem Tablet/Mobile">
           🎨 Layout: <span id="layout-name-text">SaaS Dark</span>
@@ -121,6 +128,80 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal de Sincronização em Nuvem (Supabase & GitHub) -->
+  <div id="cloud-modal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 580px; text-align: left;">
+      <button id="btn-close-cloud-modal" class="modal-close">✕</button>
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span style="font-size: 1.8rem;">☁️</span>
+        <div>
+          <h3 style="font-size: 1.35rem; font-weight: 800; margin: 0;">Sincronização em Nuvem em Tempo Real</h3>
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Conecte com seu GitHub no Supabase para receber leads de qualquer celular instantaneamente!</p>
+        </div>
+      </div>
+
+      <!-- Quick Steps Guide -->
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-glass); border-radius: 10px; padding: 0.85rem; margin: 1rem 0; font-size: 0.85rem;">
+        <p style="margin: 0 0 0.5rem; font-weight: 700; color: var(--accent-cyan);">🚀 Como conectar em 1 minuto com sua conta GitHub:</p>
+        <ol style="margin: 0; padding-left: 1.2rem; line-height: 1.5; color: var(--text-secondary);">
+          <li>Acesse <a href="https://supabase.com" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">supabase.com</a> e clique em <strong>"Continue with GitHub"</strong>.</li>
+          <li>Crie um projeto gratuito e abra o menu <strong>SQL Editor</strong>.</li>
+          <li>Cole o código SQL abaixo e clique em <strong>Run</strong>:</li>
+        </ol>
+        <div style="position: relative; margin-top: 0.5rem;">
+          <pre id="sql-code-block" style="background: #040814; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.6rem; border-radius: 6px; font-size: 0.75rem; color: #a5f3fc; overflow-x: auto; max-height: 110px;">create table if not exists leads (
+  id text primary key,
+  timestamp timestamptz default now(),
+  name text,
+  company text,
+  role text,
+  whatsapp text,
+  email text,
+  segment text,
+  "segmentLabel" text,
+  revenue text,
+  "revenueLabel" text,
+  pains jsonb,
+  "currentSystem" text,
+  urgency text,
+  score int,
+  status text,
+  "estimatedMonthlyLoss" text,
+  "estimatedMonthlyHours" text
+);
+alter table leads enable row level security;
+create policy "Public Read" on leads for select using (true);
+create policy "Public Insert" on leads for insert with check (true);</pre>
+          <button id="btn-copy-sql" type="button" class="btn-nav" style="position: absolute; top: 6px; right: 6px; padding: 0.2rem 0.6rem; font-size: 0.72rem;">📋 Copiar SQL</button>
+        </div>
+      </div>
+
+      <!-- Credentials Form -->
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <div>
+          <label class="form-label" style="font-size: 0.8rem;">Project URL (ex: https://abcdefghijkl.supabase.co):</label>
+          <input type="text" id="input-supabase-url" class="form-input" placeholder="https://seu-projeto.supabase.co" style="font-size: 0.85rem; padding: 0.55rem 0.8rem;">
+        </div>
+
+        <div>
+          <label class="form-label" style="font-size: 0.8rem;">Project API Key (anon / public):</label>
+          <input type="password" id="input-supabase-key" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-size: 0.85rem; padding: 0.55rem 0.8rem;">
+        </div>
+
+        <div id="cloud-test-status" style="font-size: 0.85rem; min-height: 20px;"></div>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; flex-wrap: wrap;">
+          <button id="btn-clear-cloud" class="btn-nav" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">Desconectar</button>
+          <button id="btn-sync-now" class="btn-nav">⬆️ Enviar Leads Locais</button>
+          <button id="btn-save-cloud" class="btn-nav btn-accent">💾 Testar & Salvar Conexão</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container para alertas em tempo real -->
+  <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
 
   <script type="module" src="js/storage.js"></script>
   <script type="module" src="js/dashboard.js"></script>

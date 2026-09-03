@@ -3,6 +3,7 @@
  */
 
 import { StorageManager } from './storage.js';
+import { CLOUD_CONFIG } from './config.js';
 
 export class DashboardController {
   constructor() {
@@ -10,7 +11,9 @@ export class DashboardController {
     this.searchQuery = '';
     this.initElements();
     this.initLayoutTheme();
+    this.initCloudStatus();
     this.bindEvents();
+    this.initCloudSync();
   }
 
   initElements() {
@@ -29,6 +32,21 @@ export class DashboardController {
 
     this.btnToggleLayout = document.getElementById('btn-toggle-layout');
     this.layoutNameText = document.getElementById('layout-name-text');
+
+    // Cloud Modal & Elements
+    this.btnCloudConfig = document.getElementById('btn-cloud-config');
+    this.cloudStatusIndicator = document.getElementById('cloud-status-indicator');
+    this.cloudStatusText = document.getElementById('cloud-status-text');
+    this.cloudModal = document.getElementById('cloud-modal');
+    this.btnCloseCloudModal = document.getElementById('btn-close-cloud-modal');
+    this.inputSupabaseUrl = document.getElementById('input-supabase-url');
+    this.inputSupabaseKey = document.getElementById('input-supabase-key');
+    this.btnSaveCloud = document.getElementById('btn-save-cloud');
+    this.btnClearCloud = document.getElementById('btn-clear-cloud');
+    this.btnSyncNow = document.getElementById('btn-sync-now');
+    this.btnCopySql = document.getElementById('btn-copy-sql');
+    this.cloudTestStatus = document.getElementById('cloud-test-status');
+    this.toastContainer = document.getElementById('toast-container');
 
     this.filterButtons = document.querySelectorAll('.btn-filter-status');
     this.inputSearchLead = document.getElementById('input-search-lead');
@@ -61,6 +79,45 @@ export class DashboardController {
     }
   }
 
+  initCloudStatus() {
+    const isConfigured = CLOUD_CONFIG.isConfigured();
+    if (this.cloudStatusIndicator && this.cloudStatusText) {
+      if (isConfigured) {
+        this.cloudStatusIndicator.innerText = '🟢';
+        this.cloudStatusText.innerText = 'Nuvem Ativa';
+        this.cloudStatusText.style.color = '#10b981';
+      } else {
+        this.cloudStatusIndicator.innerText = '🟡';
+        this.cloudStatusText.innerText = 'Modo Local';
+        this.cloudStatusText.style.color = '#f59e0b';
+      }
+    }
+
+    if (this.inputSupabaseUrl && CLOUD_CONFIG.supabaseUrl) {
+      this.inputSupabaseUrl.value = CLOUD_CONFIG.supabaseUrl;
+    }
+    if (this.inputSupabaseKey && CLOUD_CONFIG.supabaseAnonKey) {
+      this.inputSupabaseKey.value = CLOUD_CONFIG.supabaseAnonKey;
+    }
+  }
+
+  async initCloudSync() {
+    if (CLOUD_CONFIG.isConfigured()) {
+      // 1. Busca todos os leads já gravados na nuvem
+      console.log('📡 Buscando leads atualizados na nuvem...');
+      const freshLeads = await StorageManager.fetchCloudLeads();
+      this.renderMetrics();
+      this.renderLeadsTable();
+
+      // 2. Ouve novos leads em tempo real (quando alguém enviar pelo celular)
+      StorageManager.subscribeToLeads((newLead) => {
+        this.showToast(`🔥 Novo Lead do Celular: <strong>${newLead.name || 'Novo contato'}</strong> (${newLead.company || 'Empresa'})!`);
+        this.renderMetrics();
+        this.renderLeadsTable();
+      });
+    }
+  }
+
   bindEvents() {
     if (this.btnToggleLayout) {
       this.btnToggleLayout.addEventListener('click', () => this.toggleLayoutTheme());
@@ -82,6 +139,42 @@ export class DashboardController {
       this.qrModal.addEventListener('click', (e) => {
         if (e.target === this.qrModal) this.toggleQRModal(false);
       });
+    }
+
+    // Cloud Modal Events
+    if (this.btnCloudConfig) {
+      this.btnCloudConfig.addEventListener('click', () => this.toggleCloudModal(true));
+    }
+
+    if (this.btnCloseCloudModal) {
+      this.btnCloseCloudModal.addEventListener('click', () => this.toggleCloudModal(false));
+    }
+
+    if (this.cloudModal) {
+      this.cloudModal.addEventListener('click', (e) => {
+        if (e.target === this.cloudModal) this.toggleCloudModal(false);
+      });
+    }
+
+    if (this.btnCopySql) {
+      this.btnCopySql.addEventListener('click', () => {
+        const sqlText = document.getElementById('sql-code-block').innerText;
+        navigator.clipboard.writeText(sqlText);
+        this.btnCopySql.innerText = '✅ Copiado!';
+        setTimeout(() => { this.btnCopySql.innerText = '📋 Copiar SQL'; }, 2000);
+      });
+    }
+
+    if (this.btnSaveCloud) {
+      this.btnSaveCloud.addEventListener('click', () => this.handleSaveCloud());
+    }
+
+    if (this.btnClearCloud) {
+      this.btnClearCloud.addEventListener('click', () => this.handleClearCloud());
+    }
+
+    if (this.btnSyncNow) {
+      this.btnSyncNow.addEventListener('click', () => this.handleSyncLocalToCloud());
     }
 
     if (this.inputQRUrl) {
@@ -107,6 +200,101 @@ export class DashboardController {
         this.renderLeadsTable();
       });
     }
+  }
+
+  toggleCloudModal(show) {
+    if (this.cloudModal) {
+      if (show) {
+        this.cloudModal.classList.add('active');
+        if (this.cloudTestStatus) this.cloudTestStatus.innerHTML = '';
+      } else {
+        this.cloudModal.classList.remove('active');
+      }
+    }
+  }
+
+  async handleSaveCloud() {
+    const url = (this.inputSupabaseUrl?.value || '').trim();
+    const key = (this.inputSupabaseKey?.value || '').trim();
+
+    if (!url || !key) {
+      this.setCloudStatusMessage('Por favor, informe a URL do projeto e a chave API (anon).', '#ef4444');
+      return;
+    }
+
+    this.setCloudStatusMessage('Testando conexão com o Supabase...', '#00f2fe');
+
+    const result = await StorageManager.testCloudConnection(url, key);
+    if (result.success) {
+      CLOUD_CONFIG.save(url, key);
+      this.initCloudStatus();
+      this.setCloudStatusMessage('✅ ' + result.message, '#10b981');
+      this.showToast('Nuvem Supabase conectada com sucesso! Atualizando leads...');
+      await this.initCloudSync();
+      setTimeout(() => this.toggleCloudModal(false), 1500);
+    } else {
+      this.setCloudStatusMessage('❌ ' + result.message, '#ef4444');
+    }
+  }
+
+  handleClearCloud() {
+    if (confirm('Deseja realmente desconectar a sincronização em nuvem e voltar ao modo local?')) {
+      CLOUD_CONFIG.clear();
+      this.initCloudStatus();
+      if (this.inputSupabaseUrl) this.inputSupabaseUrl.value = '';
+      if (this.inputSupabaseKey) this.inputSupabaseKey.value = '';
+      this.setCloudStatusMessage('Nuvem desconectada. Operando em Modo Local.', '#f59e0b');
+      this.showToast('Operando em modo local');
+    }
+  }
+
+  async handleSyncLocalToCloud() {
+    if (!CLOUD_CONFIG.isConfigured()) {
+      this.setCloudStatusMessage('Conecte a nuvem primeiro para enviar os leads locais.', '#f59e0b');
+      return;
+    }
+    this.setCloudStatusMessage('Enviando leads locais para o Supabase...', '#00f2fe');
+    try {
+      const count = await StorageManager.syncLocalToCloud();
+      this.setCloudStatusMessage(`✅ ${count} leads enviados para a nuvem com sucesso!`, '#10b981');
+      this.showToast(`${count} leads sincronizados com o Supabase!`);
+    } catch (err) {
+      this.setCloudStatusMessage(`Erro ao sincronizar: ${err.message}`, '#ef4444');
+    }
+  }
+
+  setCloudStatusMessage(msg, color) {
+    if (this.cloudTestStatus) {
+      this.cloudTestStatus.innerHTML = `<span style="color: ${color}; font-weight: 600;">${msg}</span>`;
+    }
+  }
+
+  showToast(messageHtml) {
+    if (!this.toastContainer) return;
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      background: #0f172a;
+      border: 1px solid #00f2fe;
+      box-shadow: 0 10px 30px rgba(0, 242, 254, 0.3);
+      color: #f8fafc;
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideInRight 0.3s ease-out;
+    `;
+    toast.innerHTML = `<span>⚡</span> <div>${messageHtml}</div>`;
+    this.toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      setTimeout(() => toast.remove(), 400);
+    }, 4500);
   }
 
   renderMetrics() {
