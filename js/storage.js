@@ -181,8 +181,8 @@ export const StorageManager = {
     return this.getLeads();
   },
 
-  // Ouvir leads em TEMPO REAL (quando alguém envia pelo celular, notifica na hora)
-  subscribeToLeads(onNewLead) {
+  // Ouvir leads em TEMPO REAL (quando alguém envia ou apaga)
+  subscribeToLeads(onNewLead, onDeleteLead) {
     const supabase = this.getSupabase();
     if (!supabase) return null;
 
@@ -207,6 +207,20 @@ export const StorageManager = {
             }
           }
         )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'leads' },
+          (payload) => {
+            console.log('🗑️ Lead apagado em tempo real:', payload.old);
+            if (payload.old && payload.old.id) {
+              const leads = this.getLeads().filter(l => l.id !== payload.old.id);
+              this.saveLeads(leads);
+              if (typeof onDeleteLead === 'function') {
+                onDeleteLead(payload.old.id);
+              }
+            }
+          }
+        )
         .subscribe();
 
       return channel;
@@ -214,6 +228,28 @@ export const StorageManager = {
       console.error('Erro ao subscrever canais em tempo real:', err);
       return null;
     }
+  },
+
+  // Apagar um lead (Local e Supabase)
+  async deleteLead(leadId) {
+    // 1. Remove do LocalStorage
+    const leads = this.getLeads().filter(l => l.id !== leadId);
+    this.saveLeads(leads);
+
+    // 2. Remove da Nuvem se conectado
+    const supabase = this.getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase.from('leads').delete().eq('id', leadId);
+        if (error) {
+          console.error('Erro ao apagar lead no Supabase:', error);
+          return { success: false, message: error.message };
+        }
+      } catch (err) {
+        console.error('Falha de rede ao apagar no Supabase:', err);
+      }
+    }
+    return { success: true };
   },
 
   // Testar se as credenciais do Supabase funcionam

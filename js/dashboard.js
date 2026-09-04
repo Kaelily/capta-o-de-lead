@@ -109,12 +109,18 @@ export class DashboardController {
       this.renderMetrics();
       this.renderLeadsTable();
 
-      // 2. Ouve novos leads em tempo real (quando alguém enviar pelo celular)
-      StorageManager.subscribeToLeads((newLead) => {
-        this.showToast(`🔥 Novo Lead do Celular: <strong>${newLead.name || 'Novo contato'}</strong> (${newLead.company || 'Empresa'})!`);
-        this.renderMetrics();
-        this.renderLeadsTable();
-      });
+      // 2. Ouve novos leads e exclusões em tempo real
+      StorageManager.subscribeToLeads(
+        (newLead) => {
+          this.showToast(`🔥 Novo Lead do Celular: <strong>${newLead.name || 'Novo contato'}</strong> (${newLead.company || 'Empresa'})!`);
+          this.renderMetrics();
+          this.renderLeadsTable();
+        },
+        (deletedId) => {
+          this.renderMetrics();
+          this.renderLeadsTable();
+        }
+      );
     }
   }
 
@@ -374,13 +380,42 @@ export class DashboardController {
         <td>${statusBadge}</td>
         <td style="font-size: 0.8rem; color: var(--text-muted);">${timeAgo}</td>
         <td>
-          <a href="${waUrl}" target="_blank" class="btn-whatsapp-action">
-            💬 Abordar Lead
-          </a>
+          <div style="display: flex; gap: 0.4rem; align-items: center;">
+            <a href="${waUrl}" target="_blank" class="btn-whatsapp-action" title="Abordar este lead via WhatsApp">
+              💬 Abordar
+            </a>
+            <button type="button" class="btn-delete-action" data-id="${lead.id}" data-name="${(lead.name || 'este lead').replace(/"/g, '&quot;')}" title="Apagar este lead">
+              🗑️
+            </button>
+          </div>
         </td>
       `;
 
       this.leadTableBody.appendChild(tr);
+    });
+
+    // Eventos de clique para os botões de apagar lead
+    this.leadTableBody.querySelectorAll('.btn-delete-action').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const name = btn.dataset.name || 'este lead';
+        const confirmed = confirm(`Tem certeza que deseja apagar o lead "${name}"?\n\nEsta ação removerá o lead da lista e do banco de dados.`);
+        if (confirmed) {
+          btn.disabled = true;
+          btn.innerText = '⏳';
+          const res = await StorageManager.deleteLead(id);
+          if (res.success) {
+            this.showToast(`🗑️ Lead <strong>${name}</strong> foi apagado com sucesso.`);
+            this.renderMetrics();
+            this.renderLeadsTable();
+          } else {
+            alert('Não foi possível apagar o lead: ' + (res.message || 'Erro desconhecido'));
+            btn.disabled = false;
+            btn.innerText = '🗑️';
+          }
+        }
+      });
     });
   }
 
