@@ -33,18 +33,16 @@ export class DashboardController {
     this.btnToggleLayout = document.getElementById('btn-toggle-layout');
     this.layoutNameText = document.getElementById('layout-name-text');
 
-    // Cloud Modal & Elements
+    // Database Modal & Elements
     this.btnCloudConfig = document.getElementById('btn-cloud-config');
     this.cloudStatusIndicator = document.getElementById('cloud-status-indicator');
     this.cloudStatusText = document.getElementById('cloud-status-text');
     this.cloudModal = document.getElementById('cloud-modal');
     this.btnCloseCloudModal = document.getElementById('btn-close-cloud-modal');
-    this.inputApiUrl = document.getElementById('input-api-url');
-    this.btnSaveCloud = document.getElementById('btn-save-cloud');
-    this.btnClearCloud = document.getElementById('btn-clear-cloud');
-    this.btnSyncNow = document.getElementById('btn-sync-now');
-    this.btnCopySql = document.getElementById('btn-copy-sql');
-    this.cloudTestStatus = document.getElementById('cloud-test-status');
+    this.btnDownloadJson = document.getElementById('btn-download-json');
+    this.inputImportJson = document.getElementById('input-import-json');
+    this.btnResetSampleLeads = document.getElementById('btn-reset-sample-leads');
+    this.btnClearAllLeads = document.getElementById('btn-clear-all-leads');
     this.toastContainer = document.getElementById('toast-container');
 
     this.filterButtons = document.querySelectorAll('.btn-filter-status');
@@ -90,45 +88,19 @@ export class DashboardController {
   }
 
   initCloudStatus() {
-    const isConfigured = DB_CONFIG.isConfigured();
     if (this.cloudStatusIndicator && this.cloudStatusText) {
-      if (isConfigured) {
-        this.cloudStatusIndicator.innerText = '🟢';
-        this.cloudStatusText.innerText = 'SQL Server';
-        this.cloudStatusText.style.color = '#10b981';
-      } else {
-        this.cloudStatusIndicator.innerText = '🟡';
-        this.cloudStatusText.innerText = 'Modo Local';
-        this.cloudStatusText.style.color = '#f59e0b';
-      }
-    }
-
-    if (this.inputApiUrl && DB_CONFIG.apiUrl) {
-      this.inputApiUrl.value = DB_CONFIG.apiUrl;
+      this.cloudStatusIndicator.innerText = '🟢';
+      this.cloudStatusText.innerText = 'JSON Local';
+      this.cloudStatusText.style.color = '#10b981';
     }
   }
 
   async initCloudSync() {
-    if (DB_CONFIG.isConfigured()) {
-      // 1. Busca todos os leads já gravados no SQL Server
-      console.log('📡 Buscando leads atualizados no Microsoft SQL Server...');
-      const freshLeads = await StorageManager.fetchCloudLeads();
+    // Sincronização em tempo real entre abas do navegador
+    window.addEventListener('storage', () => {
       this.renderMetrics();
       this.renderLeadsTable();
-
-      // 2. Ouve novos leads e exclusões em tempo real via polling
-      StorageManager.subscribeToLeads(
-        (newLead) => {
-          this.showToast(`🔥 Novo Lead no SQL Server: <strong>${newLead.name || 'Novo contato'}</strong> (${newLead.company || 'Empresa'})!`);
-          this.renderMetrics();
-          this.renderLeadsTable();
-        },
-        (deletedId) => {
-          this.renderMetrics();
-          this.renderLeadsTable();
-        }
-      );
-    }
+    });
   }
 
   bindEvents() {
@@ -169,25 +141,51 @@ export class DashboardController {
       });
     }
 
-    if (this.btnCopySql) {
-      this.btnCopySql.addEventListener('click', () => {
-        const sqlText = document.getElementById('sql-code-block').innerText;
-        navigator.clipboard.writeText(sqlText);
-        this.btnCopySql.innerText = '✅ Copiado!';
-        setTimeout(() => { this.btnCopySql.innerText = '📋 Copiar SQL'; }, 2000);
+    if (this.btnDownloadJson) {
+      this.btnDownloadJson.addEventListener('click', () => {
+        StorageManager.exportToJSON();
+        this.showToast('📥 Arquivo JSON de leads baixado com sucesso!');
       });
     }
 
-    if (this.btnSaveCloud) {
-      this.btnSaveCloud.addEventListener('click', () => this.handleSaveCloud());
+    if (this.inputImportJson) {
+      this.inputImportJson.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const res = await StorageManager.importFromJSON(file);
+          this.renderMetrics();
+          this.renderLeadsTable();
+          this.showToast(`✅ ${res.added} leads importados para o banco JSON local!`);
+          this.toggleCloudModal(false);
+        } catch (err) {
+          alert('Erro ao importar arquivo JSON: ' + err.message);
+        } finally {
+          this.inputImportJson.value = '';
+        }
+      });
     }
 
-    if (this.btnClearCloud) {
-      this.btnClearCloud.addEventListener('click', () => this.handleClearCloud());
+    if (this.btnResetSampleLeads) {
+      this.btnResetSampleLeads.addEventListener('click', () => {
+        if (confirm('Deseja restaurar os leads de demonstração no banco JSON?')) {
+          StorageManager.resetSampleLeads();
+          this.renderMetrics();
+          this.renderLeadsTable();
+          this.showToast('🔄 Leads de demonstração restaurados!');
+        }
+      });
     }
 
-    if (this.btnSyncNow) {
-      this.btnSyncNow.addEventListener('click', () => this.handleSyncLocalToCloud());
+    if (this.btnClearAllLeads) {
+      this.btnClearAllLeads.addEventListener('click', () => {
+        if (confirm('ATENÇÃO: Deseja apagar todos os leads do banco JSON local? Esta ação não pode ser desfeita.')) {
+          StorageManager.clearAllLeads();
+          this.renderMetrics();
+          this.renderLeadsTable();
+          this.showToast('🗑️ Todos os leads foram removidos!');
+        }
+      });
     }
 
     if (this.inputQRUrl) {
@@ -284,59 +282,6 @@ export class DashboardController {
     }
   }
 
-  async handleSaveCloud() {
-    const url = (this.inputApiUrl?.value || '').trim();
-
-    if (!url) {
-      this.setCloudStatusMessage('Por favor, informe a URL da API Node.js (ex: http://localhost:3000/api).', '#ef4444');
-      return;
-    }
-
-    this.setCloudStatusMessage('Testando conexão com a API e o SQL Server...', '#00f2fe');
-
-    const result = await StorageManager.testCloudConnection(url);
-    if (result.success) {
-      DB_CONFIG.save(url);
-      this.initCloudStatus();
-      this.setCloudStatusMessage('✅ ' + result.message, '#10b981');
-      this.showToast('SQL Server conectado com sucesso! Atualizando leads...');
-      await this.initCloudSync();
-      setTimeout(() => this.toggleCloudModal(false), 1500);
-    } else {
-      this.setCloudStatusMessage('❌ ' + result.message, '#ef4444');
-    }
-  }
-
-  handleClearCloud() {
-    if (confirm('Deseja restaurar a URL padrão da API do SQL Server (http://localhost:3000/api)?')) {
-      DB_CONFIG.clear();
-      this.initCloudStatus();
-      if (this.inputApiUrl) this.inputApiUrl.value = DB_CONFIG.apiUrl;
-      this.setCloudStatusMessage('URL da API restaurada para o padrão.', '#10b981');
-      this.showToast('Configuração restaurada');
-    }
-  }
-
-  async handleSyncLocalToCloud() {
-    if (!DB_CONFIG.isConfigured()) {
-      this.setCloudStatusMessage('Configure a URL da API antes de sincronizar.', '#f59e0b');
-      return;
-    }
-    this.setCloudStatusMessage('Enviando leads locais para o Microsoft SQL Server...', '#00f2fe');
-    try {
-      const count = await StorageManager.syncLocalToCloud();
-      this.setCloudStatusMessage(`✅ ${count} leads sincronizados no SQL Server com sucesso!`, '#10b981');
-      this.showToast(`${count} leads sincronizados com o SQL Server!`);
-    } catch (err) {
-      this.setCloudStatusMessage(`Erro ao sincronizar: ${err.message}`, '#ef4444');
-    }
-  }
-
-  setCloudStatusMessage(msg, color) {
-    if (this.cloudTestStatus) {
-      this.cloudTestStatus.innerHTML = `<span style="color: ${color}; font-weight: 600;">${msg}</span>`;
-    }
-  }
 
   showToast(messageHtml) {
     if (!this.toastContainer) return;

@@ -1,5 +1,6 @@
 /**
- * AzurraERP Lead Capture - LocalStorage & Microsoft SQL Server Sync System
+ * AzurraERP Lead Capture - Sistema de Banco de Dados JSON Local (LocalStorage)
+ * 100% no Navegador (Zero Dependências de Node.js ou SQL Server)
  * Feira FRESQUA 2026
  */
 
@@ -119,7 +120,6 @@ export const DEFAULT_PAGE_CONFIG = {
   }
 };
 
-
 const sampleLeads = [
   {
     id: 'lead-101',
@@ -139,7 +139,8 @@ const sampleLeads = [
     score: 88,
     status: 'hot',
     estimatedMonthlyLoss: 'R$ 18.500',
-    estimatedMonthlyHours: '64 hrs'
+    estimatedMonthlyHours: '64 hrs',
+    notes: 'Precisa de migração rápida para o próximo mês.'
   },
   {
     id: 'lead-102',
@@ -159,7 +160,8 @@ const sampleLeads = [
     score: 76,
     status: 'hot',
     estimatedMonthlyLoss: 'R$ 12.200',
-    estimatedMonthlyHours: '48 hrs'
+    estimatedMonthlyHours: '48 hrs',
+    notes: 'Interesse especial no módulo de emissão de NF-e rápida.'
   },
   {
     id: 'lead-103',
@@ -168,30 +170,24 @@ const sampleLeads = [
     company: 'TechServices Soluções',
     role: 'Fundador / CEO',
     whatsapp: '5531976543210',
-    email: 'fernando@techservices.com',
+    email: 'fernando@techservices.com.br',
     segment: 'servicos',
-    segmentLabel: 'Serviços',
+    segmentLabel: 'Prestação de Serviços',
     revenue: '30k_100k',
     revenueLabel: 'R$ 30.000 a R$ 100.000/mês',
-    pains: ['dre', 'vendas'],
+    pains: ['dre', 'planilhas'],
     currentSystem: 'sem_sistema',
-    urgency: 'pesquisando',
-    score: 55,
+    urgency: 'imediato',
+    score: 82,
     status: 'warm',
-    estimatedMonthlyLoss: 'R$ 4.800',
-    estimatedMonthlyHours: '22 hrs'
+    estimatedMonthlyLoss: 'R$ 6.800',
+    estimatedMonthlyHours: '28 hrs',
+    notes: 'Quer ver uma demonstração presencial no stand.'
   }
 ];
 
-let _pollingIntervalId = null;
-
 export const StorageManager = {
-  // Retorna se a API do banco está configurada
-  isCloudActive() {
-    return DB_CONFIG.isConfigured();
-  },
-
-  // Obter todos os leads do LocalStorage (ou inicializar com dados de exemplo)
+  // Retorna todos os leads salvos no banco JSON local (LocalStorage)
   getLeads() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -199,229 +195,135 @@ export const StorageManager = {
       return sampleLeads;
     }
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : sampleLeads;
     } catch (e) {
-      console.error('Erro ao ler leads locais:', e);
+      console.error('Erro ao ler banco de dados JSON local:', e);
       return sampleLeads;
     }
   },
 
-  // Salvar array completo no LocalStorage
+  // Salvar array de leads no LocalStorage e disparar evento de sincronização em tempo real
   saveLeads(leads) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+    window.dispatchEvent(new Event('storage'));
   },
 
-  // Adicionar novo lead (Salva localmente de imediato e envia para o SQL Server)
-  async addLead(leadData) {
-    // 1. Salva localmente primeiro (garantia offline imediata na feira)
+  // Adicionar novo lead (Salva localmente no banco JSON do navegador)
+  addLead(leadData) {
     const leads = this.getLeads();
     const filtered = leads.filter(l => l.id !== leadData.id);
     filtered.unshift(leadData);
     this.saveLeads(filtered);
-
-    // 2. Se a API estiver configurada, envia para o SQL Server
-    if (this.isCloudActive()) {
-      try {
-        const response = await fetch(`${DB_CONFIG.apiUrl}/leads`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(leadData)
-        });
-
-        if (response.ok) {
-          console.log('✅ Lead sincronizado com Microsoft SQL Server:', leadData.id);
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          console.warn('Servidor SQL Server recusou o lead:', errData.message || response.statusText);
-        }
-      } catch (err) {
-        console.warn('Modo offline: Falha ao contatar API SQL Server, o lead permanece seguro no LocalStorage:', err);
-      }
-    }
-
     return leadData;
   },
 
-  // Buscar todos os leads do SQL Server e mesclar com o cache local
-  async fetchCloudLeads() {
-    if (!this.isCloudActive()) return this.getLeads();
-
-    try {
-      const response = await fetch(`${DB_CONFIG.apiUrl}/leads`);
-      if (!response.ok) {
-        console.warn('API SQL Server retornou erro:', response.status);
-        return this.getLeads();
-      }
-
-      const json = await response.json();
-      if (json.success && Array.isArray(json.leads)) {
-        const serverLeads = json.leads;
-
-        // Mesclar dados do servidor com locais preservando unicidade
-        const localLeads = this.getLeads();
-        const map = new Map();
-
-        // Insere locais primeiro
-        localLeads.forEach(l => map.set(l.id, l));
-        // Sobrescreve com os do banco
-        serverLeads.forEach(s => map.set(s.id, s));
-
-        const merged = Array.from(map.values()).sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-
-        this.saveLeads(merged);
-        return merged;
-      }
-    } catch (err) {
-      console.warn('Não foi possível sincronizar com o SQL Server neste momento:', err);
-    }
-
-    return this.getLeads();
-  },
-
-  // Polling em tempo real para atualizar leads automaticamente no painel
-  subscribeToLeads(onNewLead, onDeleteLead) {
-    if (_pollingIntervalId) {
-      clearInterval(_pollingIntervalId);
-    }
-
-    let knownLeadIds = new Set(this.getLeads().map(l => l.id));
-
-    _pollingIntervalId = setInterval(async () => {
-      if (!this.isCloudActive()) return;
-
-      try {
-        const response = await fetch(`${DB_CONFIG.apiUrl}/leads`);
-        if (!response.ok) return;
-
-        const json = await response.json();
-        if (!json.success || !Array.isArray(json.leads)) return;
-
-        const currentServerIds = new Set(json.leads.map(l => l.id));
-
-        // Detecta novos leads
-        json.leads.forEach(serverLead => {
-          if (!knownLeadIds.has(serverLead.id)) {
-            console.log('⚡ Novo lead recebido do SQL Server:', serverLead);
-            const currentLocal = this.getLeads();
-            if (!currentLocal.some(l => l.id === serverLead.id)) {
-              currentLocal.unshift(serverLead);
-              this.saveLeads(currentLocal);
-            }
-            knownLeadIds.add(serverLead.id);
-            if (typeof onNewLead === 'function') {
-              onNewLead(serverLead);
-            }
-          }
-        });
-
-        // Detecta leads removidos no banco
-        for (const localId of knownLeadIds) {
-          if (!currentServerIds.has(localId)) {
-            console.log('🗑️ Lead removido no SQL Server:', localId);
-            const currentLocal = this.getLeads().filter(l => l.id !== localId);
-            this.saveLeads(currentLocal);
-            knownLeadIds.delete(localId);
-            if (typeof onDeleteLead === 'function') {
-              onDeleteLead(localId);
-            }
-          }
-        }
-      } catch {
-        // Silêncio se o backend estiver momentaneamente fora
-      }
-    }, 5000);
-
-    return {
-      unsubscribe: () => {
-        if (_pollingIntervalId) {
-          clearInterval(_pollingIntervalId);
-          _pollingIntervalId = null;
-        }
-      }
-    };
-  },
-
-  // Apagar um lead (Localmente e no SQL Server)
-  async deleteLead(leadId) {
-    // 1. Remove do LocalStorage
+  // Apagar um lead do banco JSON local
+  deleteLead(leadId) {
     const leads = this.getLeads().filter(l => l.id !== leadId);
     this.saveLeads(leads);
-
-    // 2. Remove do SQL Server se conectado
-    if (this.isCloudActive()) {
-      try {
-        const response = await fetch(`${DB_CONFIG.apiUrl}/leads/${encodeURIComponent(leadId)}`, {
-          method: 'DELETE'
-        });
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          console.error('Erro ao deletar lead no SQL Server:', err.message);
-          return { success: false, message: err.message };
-        }
-      } catch (err) {
-        console.error('Falha de rede ao deletar lead no SQL Server:', err);
-      }
-    }
-
     return { success: true };
   },
 
-  // Testar conectividade com a API e o SQL Server
-  async testCloudConnection(customUrl) {
-    let url = (customUrl || DB_CONFIG.apiUrl || '').trim().replace(/\/$/, '');
-    if (!url.endsWith('/api') && !url.includes('/api/')) {
-      url = `${url}/api`;
-    }
-
-    try {
-      const response = await fetch(`${url}/health`, { method: 'GET' });
-      const data = await response.json();
-
-      if (response.ok && data.connected) {
-        return {
-          success: true,
-          message: `Conexão bem-sucedida! Banco: ${data.databaseName || 'SQL Server'} em ${data.server || 'localhost'}`
-        };
-      } else {
-        return {
-          success: false,
-          message: `A API respondeu, mas o SQL Server não conectou: ${data.message || data.hint || 'Verifique o .env e o serviço do SQL Server.'}`
-        };
-      }
-    } catch (err) {
-      return {
-        success: false,
-        message: `Não foi possível alcançar a API Node.js em "${url}". O servidor está iniciado (node server.js)? Erro: ${err.message}`
-      };
-    }
+  // Limpar todos os leads do banco JSON
+  clearAllLeads() {
+    this.saveLeads([]);
   },
 
-  // Sincronizar todos os leads locais para o SQL Server em lote
-  async syncLocalToCloud() {
-    if (!this.isCloudActive()) throw new Error('API do SQL Server não configurada.');
+  // Restaurar leads de demonstração
+  resetSampleLeads() {
+    this.saveLeads(sampleLeads);
+    return sampleLeads;
+  },
+
+  // Exportar / Baixar arquivo JSON completo (leads.json)
+  exportToJSON() {
     const leads = this.getLeads();
-    if (!leads || leads.length === 0) return 0;
-
-    const response = await fetch(`${DB_CONFIG.apiUrl}/leads/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leads })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || 'Falha ao sincronizar com o SQL Server.');
-    }
-
-    const data = await response.json();
-    return data.count || leads.length;
+    const dataStr = JSON.stringify(leads, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `leads_azurraerp_fresqua_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   },
 
-  // Limpar leads locais
-  clearLeads() {
-    localStorage.removeItem(STORAGE_KEY);
+  // Importar arquivo JSON externo (leads.json) para o banco do navegador
+  async importFromJSON(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedLeads = JSON.parse(e.target.result);
+          if (!Array.isArray(importedLeads)) {
+            return reject(new Error('O arquivo selecionado não contém uma lista válida de leads.'));
+          }
+
+          // Mesclar com os leads existentes pelo ID
+          const currentLeads = this.getLeads();
+          const map = new Map();
+          currentLeads.forEach(l => map.set(l.id, l));
+          importedLeads.forEach(l => {
+            if (l && l.id) map.set(l.id, l);
+          });
+
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+          );
+
+          this.saveLeads(merged);
+          resolve({ success: true, count: merged.length, added: importedLeads.length });
+        } catch (err) {
+          reject(new Error('Formato JSON inválido: ' + err.message));
+        }
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler o arquivo selecionado.'));
+      reader.readAsText(file);
+    });
+  },
+
+  // Exportar leads para arquivo CSV compatível com Excel e Google Sheets
+  exportToCSV() {
+    const leads = this.getLeads();
+    if (!leads || leads.length === 0) return alert('Nenhum lead para exportar.');
+
+    const headers = [
+      'ID', 'Data/Hora', 'Nome', 'Empresa', 'Cargo', 'WhatsApp', 'Email',
+      'Segmento', 'Faturamento', 'Sistema Atual', 'Urgencia', 'Score',
+      'Status Temperatura', 'Perda Mensal Estimada', 'Tempo Desperdiçado', 'Observacoes'
+    ];
+
+    const rows = leads.map(l => [
+      `"${l.id}"`,
+      `"${new Date(l.timestamp).toLocaleString('pt-BR')}"`,
+      `"${l.name || ''}"`,
+      `"${l.company || ''}"`,
+      `"${l.role || ''}"`,
+      `"${l.whatsapp || ''}"`,
+      `"${l.email || ''}"`,
+      `"${l.segmentLabel || l.segment || ''}"`,
+      `"${l.revenueLabel || l.revenue || ''}"`,
+      `"${l.currentSystem || ''}"`,
+      `"${l.urgency || ''}"`,
+      `"${l.score}"`,
+      `"${(l.status || '').toUpperCase()}"`,
+      `"${l.estimatedMonthlyLoss || ''}"`,
+      `"${l.estimatedMonthlyHours || ''}"`,
+      `"${(l.notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `leads_azurraerp_fresqua_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
 
   // Gerar link de WhatsApp para o CLIENTE falar com a empresa AzurraERP (+55 11 3181-7744)
@@ -465,44 +367,6 @@ export const StorageManager = {
     ].join('\n');
 
     return `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
-  },
-
-  // Exportar leads para CSV
-  exportToCSV() {
-    const leads = this.getLeads();
-    if (!leads || leads.length === 0) return alert('Nenhum lead para exportar.');
-
-    const headers = [
-      'ID', 'Data/Hora', 'Nome', 'Empresa', 'Cargo', 'WhatsApp', 'Email',
-      'Segmento', 'Faturamento', 'Sistema Atual', 'Urgencia', 'Score',
-      'Status Temperatura', 'Perda Mensal Estimada'
-    ];
-
-    const rows = leads.map(l => [
-      `"${l.id}"`,
-      `"${new Date(l.timestamp).toLocaleString('pt-BR')}"`,
-      `"${l.name || ''}"`,
-      `"${l.company || ''}"`,
-      `"${l.whatsapp || ''}"`,
-      `"${l.email || ''}"`,
-      `"${l.segmentLabel || l.segment || ''}"`,
-      `"${l.revenueLabel || l.revenue || ''}"`,
-      `"${l.currentSystem || ''}"`,
-      `"${l.urgency || ''}"`,
-      `"${l.score}"`,
-      `"${l.status.toUpperCase()}"`,
-      `"${l.estimatedMonthlyLoss || ''}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `leads_azurraerp_fresqua_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   },
 
   // Obter configurações personalizadas da tela de captura
@@ -574,4 +438,3 @@ export const StorageManager = {
     return DEFAULT_PAGE_CONFIG;
   }
 };
-
