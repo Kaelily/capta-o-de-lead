@@ -73,44 +73,15 @@ class DiagnosticApp {
       this.btnNext.addEventListener('click', () => this.handleNext());
     }
 
-    // Option cards selection logic via event delegation (works even after dynamic customization renders)
-    document.addEventListener('click', (e) => {
-      const cardSingle = e.target.closest('.option-single');
-      if (cardSingle) {
-        const group = cardSingle.dataset.group;
-        const value = cardSingle.dataset.value;
-        const titleEl = cardSingle.querySelector('.option-title');
-        const label = cardSingle.dataset.label || (titleEl ? titleEl.innerText : value);
+    this.bindOptionEvents();
 
-        // Deselect sibling cards in same group
-        document.querySelectorAll(`.option-single[data-group="${group}"]`).forEach(c => c.classList.remove('selected'));
-        cardSingle.classList.add('selected');
-
-        this.formData[group] = value;
-        if (group === 'segment') this.formData.segmentLabel = label;
-        if (group === 'revenue') this.formData.revenueLabel = label;
-        return;
-      }
-
-      const cardMulti = e.target.closest('.option-multi');
-      if (cardMulti) {
-        const value = cardMulti.dataset.value;
-        cardMulti.classList.toggle('selected');
-
-        if (cardMulti.classList.contains('selected')) {
-          if (!this.formData.pains.includes(value)) this.formData.pains.push(value);
-        } else {
-          this.formData.pains = this.formData.pains.filter(p => p !== value);
-        }
-        return;
-      }
-    });
-
-    // Form inputs handling via event delegation (covers name, whatsapp, company, role, email, notes)
-    document.addEventListener('input', (e) => {
-      if (e.target && e.target.id && e.target.id.startsWith('input-')) {
-        const field = e.target.id.replace('input-', '');
-        this.formData[field] = e.target.value;
+    // Form inputs handling
+    ['name', 'whatsapp', 'company', 'role', 'email', 'notes'].forEach(field => {
+      const input = document.getElementById(`input-${field}`);
+      if (input) {
+        input.addEventListener('input', (e) => {
+          this.formData[field] = e.target.value;
+        });
       }
     });
   }
@@ -131,6 +102,8 @@ class DiagnosticApp {
     if (this.stepContainers[step - 1]) {
       this.stepContainers[step - 1].style.display = 'block';
     }
+
+    this.bindOptionEvents();
 
     // Update Progress Bar & Headers
     const progressPercent = (step / 4) * 100;
