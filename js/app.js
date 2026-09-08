@@ -397,13 +397,21 @@ class DiagnosticApp {
     if (btnStart && config.btnStartText) btnStart.innerText = config.btnStartText;
 
     // Stats
-    if (config.stats && Array.isArray(config.stats)) {
-      config.stats.forEach((st, i) => {
-        const numEl = document.getElementById(`stat-num-${i}`);
-        const labelEl = document.getElementById(`stat-label-${i}`);
-        if (numEl && st.number !== undefined) numEl.innerText = st.number;
-        if (labelEl && st.label !== undefined) labelEl.innerText = st.label;
-      });
+    const statsContainer = document.querySelector('.hero-stats');
+    if (statsContainer) {
+      if (config.statsEnabled === false) {
+        statsContainer.style.display = 'none';
+      } else {
+        statsContainer.style.display = '';
+        if (config.stats && Array.isArray(config.stats)) {
+          config.stats.forEach((st, i) => {
+            const numEl = document.getElementById(`stat-num-${i}`);
+            const labelEl = document.getElementById(`stat-label-${i}`);
+            if (numEl && st.number !== undefined) numEl.innerText = st.number;
+            if (labelEl && st.label !== undefined) labelEl.innerText = st.label;
+          });
+        }
+      }
     }
 
     // FAQ Section

@@ -517,6 +517,9 @@ export class DashboardController {
     setVal('cfg-hero-image', config.heroImage);
 
     // Stats
+    const chkStats = document.getElementById('cfg-stats-enabled');
+    if (chkStats) chkStats.checked = config.statsEnabled !== false;
+
     if (config.stats && Array.isArray(config.stats)) {
       config.stats.forEach((st, i) => {
         setVal(`cfg-stat-num-${i}`, st.number);
@@ -856,6 +859,7 @@ export class DashboardController {
       }
     };
 
+    const chkStats = document.getElementById('cfg-stats-enabled');
     const chkFaq = document.getElementById('cfg-faq-enabled');
 
     const resultScreen = {
@@ -871,6 +875,7 @@ export class DashboardController {
       heroSubtitle: getVal('cfg-hero-subtitle'),
       btnStartText: getVal('cfg-btn-start'),
       heroImage: getVal('cfg-hero-image'),
+      statsEnabled: chkStats ? chkStats.checked : true,
       stats,
       faqEnabled: chkFaq ? chkFaq.checked : true,
       faqTitle: getVal('cfg-faq-title'),

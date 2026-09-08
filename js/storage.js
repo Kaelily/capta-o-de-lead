@@ -18,6 +18,7 @@ export const DEFAULT_PAGE_CONFIG = {
   heroSubtitle: 'Responda 5 perguntas rápidas (60 segundos) e receba seu <strong>Raio-X de Eficiência Operacional</strong> completo, com estimativa de economia e condição especial de feira.',
   heroImage: '',
   btnStartText: 'Iniciar Diagnóstico Gratuito ➔',
+  statsEnabled: true,
   stats: [
     { number: '60 seg', label: 'Duração do Diagnóstico' },
     { number: '+40%', label: 'Eficiência Média Ganha' },
