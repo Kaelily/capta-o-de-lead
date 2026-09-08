@@ -207,8 +207,8 @@ export const DEFAULT_PAGE_CONFIG = {
     }
   },
   resultScreen: {
-    offerDesc: 'Nossos consultores no Stand AzurraERP estão prontos para te apresentar a plataforma em funcionamento.',
-    btnWhatsappText: '💬 Receber Relatório no WhatsApp & Agendar no Stand'
+    offerDesc: 'Diagnóstico concluído com sucesso! Clique no botão abaixo para disparar o Raio-X completo diretamente para o WhatsApp do cliente.',
+    btnWhatsappText: '📲 Enviar Diagnóstico para o WhatsApp do Cliente'
   }
 };
 
@@ -803,21 +803,42 @@ export const StorageManager = {
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   },
 
-  // Gerar link de WhatsApp para a EQUIPE DO STAND chamar o lead
+  // Gerar link de WhatsApp para enviar a mensagem DIRETO PARA O CLIENTE
   getLeadWhatsAppLink(lead) {
     const cleanPhone = (lead.whatsapp || '').replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
     const name = lead.name || 'Empreendedor';
     const company = lead.company || 'sua empresa';
+    const score = lead.score || 0;
+    const loss = lead.estimatedMonthlyLoss || 'R$ 0';
+    const hours = lead.estimatedMonthlyHours || '0 hrs';
+
+    const painMap = {
+      estoque: 'Controle de Estoque e Perdas',
+      fiscal: 'Emissão Fiscal e Retrabalho NF-e',
+      dre: 'Falta de DRE e Lucratividade Real',
+      planilhas: 'Excesso de Planilhas Paralelas',
+      vendas: 'Vendas Desconectadas'
+    };
+    const painsList = Array.isArray(lead.pains) && lead.pains.length > 0
+      ? lead.pains.map(p => painMap[p] || p).join(', ')
+      : 'Processos operacionais';
 
     const message = [
-      `Ola ${name}, tudo bem? Sou da equipe da AzurraERP aqui no Stand da FRESQUA!`,
+      `Ola ${name}, tudo bem? Aqui e da equipe AzurraERP!`,
       ``,
-      `Vi que voce acabou de realizar seu Diagnostico de Gestao Empresarial para a empresa ${company}.`,
+      `Foi um prazer atender voce no nosso Stand na Feira FRESQUA!`,
       ``,
-      `Seu resultado indicou um excelente potencial de otimizacao! Temos uma condicao especial de feira com isencao da taxa de implantacao pronta para voce.`,
+      `Conforme conversamos, aqui esta o seu *Raio-X de Gestao Empresarial* para a *${company}*:`,
       ``,
-      `Vamos marcar uma conversa rapida de 10 a 15 minutos para entender a sua dor com maior profundidade?`
+      `📊 *Score de Gestao Atual:* ${score}%`,
+      `💰 *Economia / Perda Estimada:* ${loss}/mes`,
+      `⏳ *Tempo Operacional Recuperavel:* ${hours}/mes`,
+      `🎯 *Principais Gargalos Mapeados:* ${painsList}`,
+      ``,
+      `🎁 *Condicao Especial de Feira:* Garantimos a *Isencao Total da Taxa de Implantacao* para o AzurraERP!`,
+      ``,
+      `Podemos agendar uma demonstracao online de 15 minutos para voce ver a solucao na pratica? Qual o melhor horario para voce?`
     ].join('\n');
 
     return `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;

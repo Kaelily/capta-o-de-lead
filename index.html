@@ -162,18 +162,25 @@
       </div>
     </div>
 
-    <!-- Diagnostic Result Screen (Card Final do Cliente) -->
+    <!-- Diagnostic Result Screen (Card Final do Atendimento) -->
     <div id="screen-result" class="screen-result" style="display: none; padding: 1rem 0;">
       <div class="result-cta-box" style="text-align: center; padding: 3rem 2rem; max-width: 720px; margin: 0 auto;">
         <div style="width: 36px; height: 5px; background: var(--accent-cyan); border-radius: 3px; margin: 0 auto 2rem; box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);"></div>
         
+        <h3 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem;">Diagnóstico Concluído com Sucesso!</h3>
         <p id="result-offer-desc" style="color: var(--text-secondary); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; font-size: 1.05rem; line-height: 1.6;">
-          Nossos consultores no Stand AzurraERP estão prontos para te apresentar a plataforma em funcionamento.
+          Clique no botão abaixo para disparar o Raio-X completo diretamente para o WhatsApp do cliente.
         </p>
 
-        <a id="btn-talk-consultant" href="#" target="_blank" class="btn-start-quiz" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; width: 100%; max-width: 500px; padding: 1rem 1.5rem; font-size: 1rem;">
-          💬 Receber Relatório no WhatsApp & Agendar no Stand
+        <a id="btn-talk-consultant" href="#" target="_blank" class="btn-start-quiz" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; width: 100%; max-width: 500px; padding: 1.1rem 1.5rem; font-size: 1.05rem; margin-bottom: 1.25rem;">
+          📲 Enviar Diagnóstico para o WhatsApp do Cliente
         </a>
+
+        <div>
+          <button type="button" id="btn-restart-quiz" class="btn-nav" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; padding: 0.6rem 1.25rem;">
+            🔄 Iniciar Novo Atendimento
+          </button>
+        </div>
       </div>
     </div>
 

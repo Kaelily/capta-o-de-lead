@@ -84,6 +84,13 @@ class DiagnosticApp {
         });
       }
     });
+
+    const btnRestart = document.getElementById('btn-restart-quiz');
+    if (btnRestart) {
+      btnRestart.addEventListener('click', () => {
+        window.location.reload();
+      });
+    }
   }
 
   goToStep(step) {
@@ -284,10 +291,10 @@ class DiagnosticApp {
     // Render Recommended AzurraERP Modules
     this.renderRecommendedModules(this.formData.pains);
 
-    // Setup Official AzurraERP WhatsApp (+55 11 3181-7744) Link for the Client
+    // Setup WhatsApp Link direto para o WhatsApp do CLIENTE cadastrado
     const btnTalkConsultant = document.getElementById('btn-talk-consultant');
     if (btnTalkConsultant) {
-      btnTalkConsultant.href = StorageManager.getCompanyWhatsAppLink(leadRecord);
+      btnTalkConsultant.href = StorageManager.getLeadWhatsAppLink(leadRecord);
     }
   }
 
