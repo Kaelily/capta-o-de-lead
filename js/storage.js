@@ -97,6 +97,10 @@ export function supabaseRowToLead(row) {
 }
 
 const STORAGE_KEY = 'azurra_fresqua_leads_v1';
+// Purga imediata de qualquer resquício de leads armazenados localmente no navegador
+try {
+  localStorage.removeItem(STORAGE_KEY);
+} catch (e) {}
 const PAGE_CONFIG_KEY = 'azurra_lead_page_config_v1';
 export const COMPANY_WHATSAPP_NUMBER = '551131817744'; // AzurraERP Official WhatsApp (+55 11 3181-7744)
 
@@ -215,51 +219,59 @@ export const DEFAULT_PAGE_CONFIG = {
 const sampleLeads = [];
 
 export const StorageManager = {
-  // Retorna todos os leads cadastrados
+  _cachedLeads: [],
+
+  // Retorna todos os leads (obtidos exclusivamente do Supabase)
   getLeads() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error('Erro ao ler leads:', e);
-      return [];
-    }
+    return Array.isArray(this._cachedLeads) ? this._cachedLeads : [];
   },
 
-  // Salvar array de leads em cache e disparar sincronização
-  saveLeads(leads) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+  setMemoryLeads(leads) {
+    this._cachedLeads = Array.isArray(leads) ? leads : [];
     window.dispatchEvent(new Event('storage'));
   },
 
-  // Adicionar novo lead (Envia diretamente para o banco de dados Supabase)
-  addLead(leadData) {
-    const leads = this.getLeads();
-    const filtered = leads.filter(l => l.id !== leadData.id);
-    filtered.unshift(leadData);
-    this.saveLeads(filtered);
+  // Atualizar cache de leads em memória
+  saveLeads(leads) {
+    this._cachedLeads = Array.isArray(leads) ? leads : [];
+    window.dispatchEvent(new Event('storage'));
+  },
 
-    // Envio direto para o Supabase
+  // Adicionar novo lead (Salva diretamente e exclusivamente no banco de dados Supabase)
+  async addLead(leadData) {
+    if (!Array.isArray(this._cachedLeads)) {
+      this._cachedLeads = [];
+    }
+    const filtered = this._cachedLeads.filter(l => l.id !== leadData.id);
+    filtered.unshift(leadData);
+    this._cachedLeads = filtered;
+
+    // Envio direto e exclusivo para o Supabase
     if (SUPABASE_CONFIG.isConfigured()) {
-      this.sendLeadToSupabase(leadData).catch(err => {
+      try {
+        await this.sendLeadToSupabase(leadData);
+      } catch (err) {
         console.warn('Erro ao enviar lead para o Supabase:', err);
-      });
+      }
+    } else {
+      console.warn('Aviso: Supabase ainda não configurado nas preferências.');
     }
 
     return leadData;
   },
 
-  // Apagar lead do Supabase
-  deleteLead(leadId) {
-    const leads = this.getLeads().filter(l => l.id !== leadId);
-    this.saveLeads(leads);
+  // Apagar lead exclusivamente do Supabase
+  async deleteLead(leadId) {
+    if (Array.isArray(this._cachedLeads)) {
+      this._cachedLeads = this._cachedLeads.filter(l => l.id !== leadId);
+    }
 
     if (SUPABASE_CONFIG.isConfigured()) {
-      this.deleteLeadFromSupabase(leadId).catch(err => {
+      try {
+        return await this.deleteLeadFromSupabase(leadId);
+      } catch (err) {
         console.warn('Erro ao deletar lead remoto no Supabase:', err);
-      });
+      }
     }
 
     return { success: true };
@@ -379,8 +391,12 @@ export const StorageManager = {
       }
 
       const rows = await response.json();
-      if (!Array.isArray(rows)) return [];
-      return rows.map(supabaseRowToLead);
+      if (!Array.isArray(rows)) {
+        this._cachedLeads = [];
+        return [];
+      }
+      this._cachedLeads = rows.map(supabaseRowToLead);
+      return this._cachedLeads;
     } catch (err) {
       console.error('Erro ao buscar leads do Supabase:', err);
       throw err;
@@ -454,9 +470,13 @@ export const StorageManager = {
     };
   },
 
-  // Limpar lista local de leads
+  // Limpar lista de leads
   clearAllLeads() {
-    this.saveLeads([]);
+    this._cachedLeads = [];
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+    window.dispatchEvent(new Event('storage'));
   },
 
   // Exportar leads em planilha estruturada compatível nativamente com Microsoft Excel (.xls)

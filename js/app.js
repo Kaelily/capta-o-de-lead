@@ -34,7 +34,6 @@ class DiagnosticApp {
   initElements() {
     this.welcomeScreen = document.getElementById('screen-welcome');
     this.quizCard = document.getElementById('quiz-card');
-    this.resultScreen = document.getElementById('screen-result');
 
     this.progressBar = document.getElementById('quiz-progress-bar');
     this.stepIndicatorText = document.getElementById('step-indicator-text');
@@ -97,7 +96,6 @@ class DiagnosticApp {
     this.currentStep = step;
 
     this.welcomeScreen.style.display = 'none';
-    this.resultScreen.style.display = 'none';
     this.quizCard.style.display = 'block';
 
     // Hide all step bodies
@@ -339,9 +337,8 @@ class DiagnosticApp {
 
   resetToWelcome() {
     this.currentStep = 0;
-    this.welcomeScreen.style.display = 'block';
-    this.quizCard.style.display = 'none';
-    this.resultScreen.style.display = 'none';
+    if (this.welcomeScreen) this.welcomeScreen.style.display = 'block';
+    if (this.quizCard) this.quizCard.style.display = 'none';
   }
 
   loadPageConfig() {

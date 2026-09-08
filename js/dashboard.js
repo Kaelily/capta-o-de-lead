@@ -14,6 +14,7 @@ export class DashboardController {
     this.initCloudStatus();
     this.bindEvents();
     this.initCloudSync();
+    this.loadLeadsFromSupabase();
   }
 
   initElements() {
@@ -25,6 +26,7 @@ export class DashboardController {
     this.metricAvgScore = document.getElementById('metric-avg-score');
     this.metricTotalLoss = document.getElementById('metric-total-loss');
 
+    this.btnRefreshLeads = document.getElementById('btn-refresh-leads');
     this.btnExportCSV = document.getElementById('btn-export-csv');
     this.btnShowQR = document.getElementById('btn-show-qr');
     this.qrModal = document.getElementById('qr-modal');
@@ -143,6 +145,10 @@ export class DashboardController {
   }
 
   bindEvents() {
+    if (this.btnRefreshLeads) {
+      this.btnRefreshLeads.addEventListener('click', () => this.loadLeadsFromSupabase(true));
+    }
+
     if (this.btnToggleLayout) {
       this.btnToggleLayout.addEventListener('click', () => this.toggleLayoutTheme());
     }
@@ -239,6 +245,7 @@ export class DashboardController {
         SUPABASE_CONFIG.saveConfig(url, key);
         this.initSupabaseUI();
         this.showToast('💾 Configurações do Supabase salvas com sucesso!');
+        this.loadLeadsFromSupabase(true);
       });
     }
 
@@ -441,6 +448,54 @@ export class DashboardController {
     }, 4500);
   }
 
+  async loadLeadsFromSupabase(isManual = false) {
+    if (!SUPABASE_CONFIG.isConfigured()) {
+      StorageManager.clearAllLeads();
+      this.renderMetrics();
+      this.renderLeadsTable();
+      if (isManual) {
+        this.showToast('ℹ️ Supabase não configurado. Adicione suas credenciais no botão Banco.');
+      }
+      return;
+    }
+
+    if (this.btnRefreshLeads) {
+      this.btnRefreshLeads.disabled = true;
+      this.btnRefreshLeads.innerText = '⏳ Carregando...';
+    }
+
+    if (this.leadTableBody) {
+      this.leadTableBody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; color: var(--accent-cyan); padding: 2.5rem;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+              <span style="font-size: 1.8rem;">⚡</span>
+              <div style="font-weight: 600;">Carregando registros diretamente do Supabase...</div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    try {
+      const leads = await StorageManager.fetchLeadsFromSupabase();
+      this.renderMetrics();
+      this.renderLeadsTable();
+      if (isManual) {
+        this.showToast(`✅ ${leads.length} lead(s) carregados do Supabase.`);
+      }
+    } catch (err) {
+      this.renderMetrics();
+      this.renderLeadsTable();
+      this.showToast(`⚠️ Erro ao consultar Supabase: ${err.message}`);
+    } finally {
+      if (this.btnRefreshLeads) {
+        this.btnRefreshLeads.disabled = false;
+        this.btnRefreshLeads.innerText = '🔄 Atualizar Supabase';
+      }
+    }
+  }
+
   renderMetrics() {
     const leads = StorageManager.getLeads();
 
@@ -478,10 +533,16 @@ export class DashboardController {
     this.leadTableBody.innerHTML = '';
 
     if (leads.length === 0) {
+      const isConnected = SUPABASE_CONFIG.isConfigured();
       this.leadTableBody.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-            Nenhum lead encontrado com os filtros atuais.
+          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+            <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-secondary);">
+              ${isConnected ? 'Nenhum lead encontrado no banco Supabase.' : 'Supabase não configurado.'}
+            </div>
+            <div style="font-size: 0.85rem;">
+              ${isConnected ? 'Assim que você preencher o formulário no stand, o lead será salvo diretamente na nuvem e aparecerá aqui.' : 'Clique em "Banco: Supabase" no menu para salvar suas credenciais.'}
+            </div>
           </td>
         </tr>
       `;
