@@ -2,8 +2,8 @@
  * AzurraERP Lead Capture - Booth Team Dashboard Controller
  */
 
-import { StorageManager } from './storage.js';
-import { DB_CONFIG } from './config.js';
+import { StorageManager, SUPABASE_SCHEMA_SQL } from './storage.js';
+import { DB_CONFIG, SUPABASE_CONFIG } from './config.js';
 
 export class DashboardController {
   constructor() {
@@ -44,6 +44,20 @@ export class DashboardController {
     this.btnResetSampleLeads = document.getElementById('btn-reset-sample-leads');
     this.btnClearAllLeads = document.getElementById('btn-clear-all-leads');
     this.toastContainer = document.getElementById('toast-container');
+
+    // Supabase DB Modal Elements
+    this.tabBtnSupabase = document.getElementById('tab-btn-supabase');
+    this.tabBtnLocal = document.getElementById('tab-btn-local');
+    this.tabContentSupabase = document.getElementById('tab-content-supabase');
+    this.tabContentLocal = document.getElementById('tab-content-local');
+
+    this.inputSupabaseUrl = document.getElementById('input-supabase-url');
+    this.inputSupabaseKey = document.getElementById('input-supabase-key');
+    this.supabaseStatusPill = document.getElementById('supabase-status-pill');
+    this.btnTestSupabase = document.getElementById('btn-test-supabase');
+    this.btnSaveSupabase = document.getElementById('btn-save-supabase');
+    this.btnSyncSupabase = document.getElementById('btn-sync-supabase');
+    this.btnCopySupabaseSql = document.getElementById('btn-copy-supabase-sql');
 
     this.filterButtons = document.querySelectorAll('.btn-filter-status');
     this.inputSearchLead = document.getElementById('input-search-lead');
@@ -88,10 +102,56 @@ export class DashboardController {
   }
 
   initCloudStatus() {
-    if (this.cloudStatusIndicator && this.cloudStatusText) {
-      this.cloudStatusIndicator.innerText = '🟢';
-      this.cloudStatusText.innerText = 'JSON Local';
-      this.cloudStatusText.style.color = '#10b981';
+    this.initSupabaseUI();
+  }
+
+  initSupabaseUI() {
+    const cfg = SUPABASE_CONFIG.getConfig();
+    if (this.inputSupabaseUrl && cfg.url) {
+      this.inputSupabaseUrl.value = cfg.url;
+    }
+    if (this.inputSupabaseKey && cfg.anonKey) {
+      this.inputSupabaseKey.value = cfg.anonKey;
+    }
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      if (this.cloudStatusIndicator) this.cloudStatusIndicator.innerText = '🟢';
+      if (this.cloudStatusText) {
+        this.cloudStatusText.innerText = 'Supabase + Local';
+        this.cloudStatusText.style.color = '#00f2fe';
+      }
+      if (this.supabaseStatusPill) {
+        this.supabaseStatusPill.innerText = '🟢 Supabase Configurado';
+        this.supabaseStatusPill.style.background = 'rgba(16, 185, 129, 0.2)';
+        this.supabaseStatusPill.style.color = '#10b981';
+      }
+    } else {
+      if (this.cloudStatusIndicator) this.cloudStatusIndicator.innerText = '📁';
+      if (this.cloudStatusText) {
+        this.cloudStatusText.innerText = 'JSON Local';
+        this.cloudStatusText.style.color = '#10b981';
+      }
+      if (this.supabaseStatusPill) {
+        this.supabaseStatusPill.innerText = '⚪ Não configurado (Apenas Local)';
+        this.supabaseStatusPill.style.background = 'rgba(148, 163, 184, 0.2)';
+        this.supabaseStatusPill.style.color = 'var(--text-secondary)';
+      }
+    }
+  }
+
+  switchDbTab(tabName) {
+    if (this.tabBtnSupabase && this.tabBtnLocal && this.tabContentSupabase && this.tabContentLocal) {
+      if (tabName === 'supabase') {
+        this.tabBtnSupabase.classList.add('active');
+        this.tabBtnLocal.classList.remove('active');
+        this.tabContentSupabase.style.display = 'block';
+        this.tabContentLocal.style.display = 'none';
+      } else {
+        this.tabBtnLocal.classList.add('active');
+        this.tabBtnSupabase.classList.remove('active');
+        this.tabContentLocal.style.display = 'block';
+        this.tabContentSupabase.style.display = 'none';
+      }
     }
   }
 
@@ -100,6 +160,10 @@ export class DashboardController {
     window.addEventListener('storage', () => {
       this.renderMetrics();
       this.renderLeadsTable();
+    });
+
+    window.addEventListener('supabase_config_updated', () => {
+      this.initSupabaseUI();
     });
   }
 
@@ -138,6 +202,110 @@ export class DashboardController {
     if (this.cloudModal) {
       this.cloudModal.addEventListener('click', (e) => {
         if (e.target === this.cloudModal) this.toggleCloudModal(false);
+      });
+    }
+
+    // Abas do Modal de Banco de Dados
+    if (this.tabBtnSupabase) {
+      this.tabBtnSupabase.addEventListener('click', () => this.switchDbTab('supabase'));
+    }
+    if (this.tabBtnLocal) {
+      this.tabBtnLocal.addEventListener('click', () => this.switchDbTab('local'));
+    }
+
+    // Ações Supabase
+    if (this.btnTestSupabase) {
+      this.btnTestSupabase.addEventListener('click', async () => {
+        const url = this.inputSupabaseUrl?.value?.trim() || '';
+        const key = this.inputSupabaseKey?.value?.trim() || '';
+        if (!url || !key) {
+          return alert('Por favor, informe a URL e a Anon Key do Supabase para testar.');
+        }
+
+        const originalText = this.btnTestSupabase.innerHTML;
+        this.btnTestSupabase.innerHTML = '⏳ Testando...';
+        this.btnTestSupabase.disabled = true;
+
+        try {
+          const res = await StorageManager.testSupabaseConnection(url, key);
+          if (res.success) {
+            this.showToast('✅ Conexão com Supabase validada com sucesso!');
+            if (this.supabaseStatusPill) {
+              this.supabaseStatusPill.innerText = '🟢 Conexão Ativa';
+              this.supabaseStatusPill.style.background = 'rgba(16, 185, 129, 0.2)';
+              this.supabaseStatusPill.style.color = '#10b981';
+            }
+          } else {
+            alert('Erro ao testar conexão com Supabase:\n\n' + res.error);
+            if (this.supabaseStatusPill) {
+              this.supabaseStatusPill.innerText = '🔴 Erro de Conexão';
+              this.supabaseStatusPill.style.background = 'rgba(239, 68, 68, 0.2)';
+              this.supabaseStatusPill.style.color = '#ef4444';
+            }
+          }
+        } catch (err) {
+          alert('Falha no teste: ' + err.message);
+        } finally {
+          this.btnTestSupabase.innerHTML = originalText;
+          this.btnTestSupabase.disabled = false;
+        }
+      });
+    }
+
+    if (this.btnSaveSupabase) {
+      this.btnSaveSupabase.addEventListener('click', () => {
+        const url = this.inputSupabaseUrl?.value?.trim() || '';
+        const key = this.inputSupabaseKey?.value?.trim() || '';
+        if (!url && !key) {
+          if (!confirm('Deseja desativar a conexão com Supabase e manter apenas o banco local?')) {
+            return;
+          }
+        }
+        SUPABASE_CONFIG.saveConfig(url, key);
+        this.initSupabaseUI();
+        this.showToast('💾 Configurações do Supabase salvas com sucesso!');
+      });
+    }
+
+    if (this.btnSyncSupabase) {
+      this.btnSyncSupabase.addEventListener('click', async () => {
+        if (!SUPABASE_CONFIG.isConfigured()) {
+          return alert('Configure e salve a URL e a Anon Key do Supabase antes de sincronizar.');
+        }
+
+        const originalText = this.btnSyncSupabase.innerHTML;
+        this.btnSyncSupabase.innerHTML = '⏳ Sincronizando com Supabase...';
+        this.btnSyncSupabase.disabled = true;
+
+        try {
+          const res = await StorageManager.syncWithSupabase();
+          if (res.success) {
+            this.renderMetrics();
+            this.renderLeadsTable();
+            this.showToast(`🚀 Sincronização concluída! ${res.uploaded} enviados, ${res.downloaded} baixados. Total: ${res.total} leads.`);
+          } else {
+            alert('Aviso ao sincronizar com Supabase:\n\n' + res.error);
+          }
+        } catch (err) {
+          alert('Falha na sincronização: ' + err.message);
+        } finally {
+          this.btnSyncSupabase.innerHTML = originalText;
+          this.btnSyncSupabase.disabled = false;
+        }
+      });
+    }
+
+    if (this.btnCopySupabaseSql) {
+      this.btnCopySupabaseSql.addEventListener('click', () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(SUPABASE_SCHEMA_SQL).then(() => {
+            this.showToast('📋 Script SQL copiado com sucesso! Cole no SQL Editor do Supabase.');
+          }).catch(() => {
+            prompt('Copie o código SQL abaixo e execute no SQL Editor do Supabase:', SUPABASE_SCHEMA_SQL);
+          });
+        } else {
+          prompt('Copie o código SQL abaixo e execute no SQL Editor do Supabase:', SUPABASE_SCHEMA_SQL);
+        }
       });
     }
 

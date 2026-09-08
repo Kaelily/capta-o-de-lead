@@ -4,7 +4,97 @@
  * Feira FRESQUA 2026
  */
 
-import { DB_CONFIG } from './config.js';
+import { DB_CONFIG, SUPABASE_CONFIG } from './config.js';
+
+export const SUPABASE_SCHEMA_SQL = `-- Script SQL para Supabase — AzurraERP Lead Capture (Feira FRESQUA 2026)
+CREATE TABLE IF NOT EXISTS public.leads (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    name TEXT NOT NULL,
+    company TEXT NOT NULL,
+    role TEXT,
+    whatsapp TEXT NOT NULL,
+    email TEXT,
+    segment TEXT,
+    segment_label TEXT,
+    revenue TEXT,
+    revenue_label TEXT,
+    pains JSONB DEFAULT '[]'::jsonb,
+    current_system TEXT,
+    urgency TEXT,
+    score INTEGER DEFAULT 50,
+    status TEXT DEFAULT 'warm',
+    estimated_monthly_loss TEXT,
+    estimated_monthly_hours TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir inserção de leads" ON public.leads;
+CREATE POLICY "Permitir inserção de leads" ON public.leads FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir leitura de leads" ON public.leads;
+CREATE POLICY "Permitir leitura de leads" ON public.leads FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir atualização de leads" ON public.leads;
+CREATE POLICY "Permitir atualização de leads" ON public.leads FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir deleção de leads" ON public.leads;
+CREATE POLICY "Permitir deleção de leads" ON public.leads FOR DELETE TO anon, authenticated USING (true);
+
+CREATE INDEX IF NOT EXISTS idx_leads_timestamp ON public.leads (timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_leads_status ON public.leads (status);
+CREATE INDEX IF NOT EXISTS idx_leads_whatsapp ON public.leads (whatsapp);`;
+
+export function leadToSupabaseRow(lead) {
+  return {
+    id: lead.id,
+    timestamp: lead.timestamp || new Date().toISOString(),
+    name: lead.name || '',
+    company: lead.company || '',
+    role: lead.role || '',
+    whatsapp: lead.whatsapp || '',
+    email: lead.email || '',
+    segment: lead.segment || '',
+    segment_label: lead.segmentLabel || '',
+    revenue: lead.revenue || '',
+    revenue_label: lead.revenueLabel || '',
+    pains: Array.isArray(lead.pains) ? lead.pains : [],
+    current_system: lead.currentSystem || '',
+    urgency: lead.urgency || '',
+    score: typeof lead.score === 'number' ? lead.score : parseInt(lead.score, 10) || 0,
+    status: lead.status || 'warm',
+    estimated_monthly_loss: lead.estimatedMonthlyLoss || '',
+    estimated_monthly_hours: lead.estimatedMonthlyHours || '',
+    notes: lead.notes || ''
+  };
+}
+
+export function supabaseRowToLead(row) {
+  return {
+    id: row.id,
+    timestamp: row.timestamp,
+    name: row.name,
+    company: row.company,
+    role: row.role,
+    whatsapp: row.whatsapp,
+    email: row.email,
+    segment: row.segment,
+    segmentLabel: row.segment_label,
+    revenue: row.revenue,
+    revenueLabel: row.revenue_label,
+    pains: Array.isArray(row.pains) ? row.pains : [],
+    currentSystem: row.current_system,
+    urgency: row.urgency,
+    score: row.score,
+    status: row.status,
+    estimatedMonthlyLoss: row.estimated_monthly_loss,
+    estimatedMonthlyHours: row.estimated_monthly_hours,
+    notes: row.notes
+  };
+}
 
 const STORAGE_KEY = 'azurra_fresqua_leads_v1';
 const PAGE_CONFIG_KEY = 'azurra_lead_page_config_v1';
@@ -220,20 +310,224 @@ export const StorageManager = {
     window.dispatchEvent(new Event('storage'));
   },
 
-  // Adicionar novo lead (Salva localmente no banco JSON do navegador)
+  // Adicionar novo lead (Salva localmente no banco JSON do navegador e envia para Supabase se configurado)
   addLead(leadData) {
     const leads = this.getLeads();
     const filtered = leads.filter(l => l.id !== leadData.id);
     filtered.unshift(leadData);
     this.saveLeads(filtered);
+
+    // Envio assíncrono para o Supabase (se configurado) sem travar a interface
+    if (SUPABASE_CONFIG.isConfigured()) {
+      this.sendLeadToSupabase(leadData).catch(err => {
+        console.warn('Tentativa de sincronização em segundo plano:', err);
+      });
+    }
+
     return leadData;
   },
 
-  // Apagar um lead do banco JSON local
+  // Apagar um lead do banco JSON local e do Supabase se configurado
   deleteLead(leadId) {
     const leads = this.getLeads().filter(l => l.id !== leadId);
     this.saveLeads(leads);
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      this.deleteLeadFromSupabase(leadId).catch(err => {
+        console.warn('Erro ao deletar lead remoto no Supabase:', err);
+      });
+    }
+
     return { success: true };
+  },
+
+  // Testar conexão com o projeto Supabase usando a chave anon
+  async testSupabaseConnection(customUrl, customKey) {
+    const url = (customUrl || SUPABASE_CONFIG.getUrl() || '').trim().replace(/\/+$/, '');
+    const key = (customKey || SUPABASE_CONFIG.getAnonKey() || '').trim();
+
+    if (!url || !key) {
+      return { success: false, error: 'URL e Anon Key do Supabase são obrigatórias.' };
+    }
+
+    try {
+      const response = await fetch(`${url}/rest/v1/leads?select=id&limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      });
+
+      if (!response.ok) {
+        let errText = await response.text().catch(() => '');
+        return {
+          success: false,
+          error: `Erro HTTP ${response.status}: ${errText || response.statusText}. Verifique se executou o script SQL supabase-schema.sql no seu Supabase.`
+        };
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        message: 'Conexão com Supabase validada com sucesso!',
+        count: Array.isArray(data) ? data.length : 0
+      };
+    } catch (err) {
+      return { success: false, error: `Falha na conexão de rede: ${err.message}` };
+    }
+  },
+
+  // Enviar lead individual para o Supabase via REST API
+  async sendLeadToSupabase(leadData) {
+    if (!SUPABASE_CONFIG.isConfigured()) {
+      return { skipped: true, reason: 'Supabase não configurado' };
+    }
+
+    const url = SUPABASE_CONFIG.getUrl();
+    const key = SUPABASE_CONFIG.getAnonKey();
+    const row = leadToSupabaseRow(leadData);
+
+    try {
+      const response = await fetch(`${url}/rest/v1/leads`, {
+        method: 'POST',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(row)
+      });
+
+      if (!response.ok) {
+        const errDetail = await response.text().catch(() => '');
+        console.warn('Erro ao enviar lead para Supabase:', response.status, errDetail);
+        return { success: false, error: `HTTP ${response.status}: ${errDetail}` };
+      }
+
+      console.log(`✅ Lead "${leadData.name}" (${leadData.id}) sincronizado com Supabase!`);
+      return { success: true };
+    } catch (err) {
+      console.warn('Falha de rede ao sincronizar lead com Supabase (mantido offline no navegador):', err);
+      return { success: false, offline: true, error: err.message };
+    }
+  },
+
+  // Deletar lead remoto no Supabase
+  async deleteLeadFromSupabase(leadId) {
+    if (!SUPABASE_CONFIG.isConfigured()) return { skipped: true };
+    const url = SUPABASE_CONFIG.getUrl();
+    const key = SUPABASE_CONFIG.getAnonKey();
+
+    try {
+      const response = await fetch(`${url}/rest/v1/leads?id=eq.${encodeURIComponent(leadId)}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      });
+      return { success: response.ok };
+    } catch (err) {
+      console.warn('Erro ao deletar lead no Supabase:', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  // Buscar todos os leads gravados no Supabase
+  async fetchLeadsFromSupabase() {
+    if (!SUPABASE_CONFIG.isConfigured()) return null;
+    const url = SUPABASE_CONFIG.getUrl();
+    const key = SUPABASE_CONFIG.getAnonKey();
+
+    try {
+      const response = await fetch(`${url}/rest/v1/leads?select=*&order=timestamp.desc`, {
+        method: 'GET',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const rows = await response.json();
+      if (!Array.isArray(rows)) return [];
+      return rows.map(supabaseRowToLead);
+    } catch (err) {
+      console.error('Erro ao buscar leads do Supabase:', err);
+      throw err;
+    }
+  },
+
+  // Sincronizar todos os dados bidirecionalmente (Upsert local para nuvem + Download de remotos)
+  async syncWithSupabase() {
+    if (!SUPABASE_CONFIG.isConfigured()) {
+      return { success: false, error: 'Supabase não está configurado nas preferências.' };
+    }
+
+    const localLeads = this.getLeads();
+    const url = SUPABASE_CONFIG.getUrl();
+    const key = SUPABASE_CONFIG.getAnonKey();
+
+    // 1. Enviar lote de leads locais para o Supabase
+    let uploadedCount = 0;
+    if (localLeads.length > 0) {
+      try {
+        const rows = localLeads.map(leadToSupabaseRow);
+        const response = await fetch(`${url}/rest/v1/leads`, {
+          method: 'POST',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(rows)
+        });
+
+        if (response.ok) {
+          uploadedCount = rows.length;
+        } else {
+          const errDetail = await response.text().catch(() => '');
+          console.warn('Aviso ao sincronizar lote local com Supabase:', errDetail);
+        }
+      } catch (err) {
+        console.warn('Erro de rede ao enviar lote para Supabase:', err);
+      }
+    }
+
+    // 2. Baixar leads da nuvem
+    let remoteLeads = [];
+    try {
+      remoteLeads = await this.fetchLeadsFromSupabase();
+    } catch (err) {
+      return { success: false, error: `Falha ao conectar com Supabase: ${err.message}`, uploaded: uploadedCount };
+    }
+
+    // 3. Mesclar dados locais e remotos
+    const map = new Map();
+    (remoteLeads || []).forEach(l => map.set(l.id, l));
+    localLeads.forEach(l => {
+      if (!map.has(l.id)) {
+        map.set(l.id, l);
+      }
+    });
+
+    const merged = Array.from(map.values()).sort(
+      (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+    );
+
+    this.saveLeads(merged);
+    return {
+      success: true,
+      total: merged.length,
+      uploaded: uploadedCount,
+      downloaded: remoteLeads ? remoteLeads.length : 0
+    };
   },
 
   // Limpar todos os leads do banco JSON
