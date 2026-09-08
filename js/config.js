@@ -3,11 +3,16 @@
  * Banco de Dados: JSON Local (LocalStorage) 100% no Navegador
  */
 
-export const DB_CONFIG = {
+const DB_CONFIG = {
   storageType: 'JSON Local (Navegador)',
   isConfigured() {
     return true;
   }
 };
 
-export const CLOUD_CONFIG = DB_CONFIG;
+const CLOUD_CONFIG = DB_CONFIG;
+
+if (typeof window !== 'undefined') {
+  window.DB_CONFIG = DB_CONFIG;
+  window.CLOUD_CONFIG = CLOUD_CONFIG;
+}

@@ -4,13 +4,11 @@
  * Feira FRESQUA 2026
  */
 
-import { DB_CONFIG } from './config.js';
-
 const STORAGE_KEY = 'azurra_fresqua_leads_v1';
 const PAGE_CONFIG_KEY = 'azurra_lead_page_config_v1';
-export const COMPANY_WHATSAPP_NUMBER = '551131817744'; // AzurraERP Official WhatsApp (+55 11 3181-7744)
+const COMPANY_WHATSAPP_NUMBER = '551131817744'; // AzurraERP Official WhatsApp (+55 11 3181-7744)
 
-export const DEFAULT_PAGE_CONFIG = {
+const DEFAULT_PAGE_CONFIG = {
   brandName: 'AzurraERP',
   brandTag: 'FRESQUA 2026',
   badgeText: '✨ Exclusivo Feira de Empreendedorismo FRESQUA',
@@ -186,7 +184,7 @@ const sampleLeads = [
   }
 ];
 
-export const StorageManager = {
+const StorageManager = {
   // Retorna todos os leads salvos no banco JSON local (LocalStorage)
   getLeads() {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -202,7 +200,7 @@ export const StorageManager = {
       const hasLula = parsed.some(l => l.name && l.name.toLowerCase().includes('lula'));
       if (hasLula) {
         parsed = parsed.filter(l => !l.name || !l.name.toLowerCase().includes('lula'));
-        this.saveLeads(parsed);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       }
 
       return parsed;
@@ -252,34 +250,47 @@ export const StorageManager = {
       const dataStr = JSON.stringify(leads, null, 2);
       const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.json`;
 
-      const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename);
-      link.download = filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
+      // 1. Tentar via Blob (método moderno e mais limpo)
+      let downloaded = false;
+      if (typeof window !== 'undefined' && window.Blob && window.URL && window.URL.createObjectURL) {
+        try {
+          const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', filename);
+          link.download = filename;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          downloaded = true;
+          setTimeout(() => {
+            if (link.parentNode) link.parentNode.removeChild(link);
+            URL.revokeObjectURL(url);
+          }, 3000);
+        } catch (blobErr) {
+          console.warn('Download via Blob falhou, acionando fallback:', blobErr);
+          downloaded = false;
+        }
+      }
 
-      setTimeout(() => {
-        if (link.parentNode) link.parentNode.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 2500);
+      // 2. Fallback via Data URI (funciona até quando Blob / URL.createObjectURL tem restrições)
+      if (!downloaded) {
+        const encodedUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        const link = document.createElement('a');
+        link.href = encodedUri;
+        link.setAttribute('download', filename);
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          if (link.parentNode) link.parentNode.removeChild(link);
+        }, 3000);
+      }
     } catch (err) {
-      console.warn('Download via Blob falhou, tentando fallback Data URI:', err);
-      const leads = this.getLeads();
-      const encodedUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(leads, null, 2));
-      const fallbackLink = document.createElement('a');
-      fallbackLink.href = encodedUri;
-      fallbackLink.setAttribute('download', 'leads_azurraerp.json');
-      fallbackLink.download = 'leads_azurraerp.json';
-      fallbackLink.style.display = 'none';
-      document.body.appendChild(fallbackLink);
-      fallbackLink.click();
-      setTimeout(() => {
-        if (fallbackLink.parentNode) fallbackLink.parentNode.removeChild(fallbackLink);
-      }, 2500);
+      console.error('Erro ao baixar banco JSON:', err);
+      alert('Erro ao realizar download: ' + err.message);
     }
   },
 
@@ -470,3 +481,9 @@ export const StorageManager = {
     return DEFAULT_PAGE_CONFIG;
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.StorageManager = StorageManager;
+  window.COMPANY_WHATSAPP_NUMBER = COMPANY_WHATSAPP_NUMBER;
+  window.DEFAULT_PAGE_CONFIG = DEFAULT_PAGE_CONFIG;
+}

@@ -2,10 +2,7 @@
  * AzurraERP Lead Capture - Booth Team Dashboard Controller
  */
 
-import { StorageManager } from './storage.js';
-import { DB_CONFIG } from './config.js';
-
-export class DashboardController {
+class DashboardController {
   constructor() {
     this.currentFilter = 'all';
     this.searchQuery = '';
@@ -889,6 +886,18 @@ export class DashboardController {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.dashboardController = new DashboardController();
-});
+if (typeof window !== 'undefined') {
+  window.DashboardController = DashboardController;
+}
+
+function initDashboard() {
+  if (!window.dashboardController) {
+    window.dashboardController = new DashboardController();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDashboard);
+} else {
+  initDashboard();
+}
