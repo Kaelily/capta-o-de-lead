@@ -2,7 +2,10 @@
  * AzurraERP Lead Capture - Booth Team Dashboard Controller
  */
 
-class DashboardController {
+import { StorageManager } from './storage.js';
+import { DB_CONFIG } from './config.js';
+
+export class DashboardController {
   constructor() {
     this.currentFilter = 'all';
     this.searchQuery = '';
@@ -150,6 +153,21 @@ class DashboardController {
     const btnDownloadHeader = document.getElementById('btn-download-json-header');
     if (btnDownloadHeader) {
       btnDownloadHeader.addEventListener('click', triggerJsonDownload);
+    }
+
+    const triggerExcelDownload = () => {
+      StorageManager.exportToExcel();
+      this.showToast('📊 Planilha Excel (.xls) baixada com sucesso!');
+    };
+
+    const btnExportExcel = document.getElementById('btn-export-excel');
+    if (btnExportExcel) {
+      btnExportExcel.addEventListener('click', triggerExcelDownload);
+    }
+
+    const btnExportExcelModal = document.getElementById('btn-export-excel-modal');
+    if (btnExportExcelModal) {
+      btnExportExcelModal.addEventListener('click', triggerExcelDownload);
     }
 
     if (this.inputImportJson) {
@@ -886,18 +904,6 @@ class DashboardController {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.DashboardController = DashboardController;
-}
-
-function initDashboard() {
-  if (!window.dashboardController) {
-    window.dashboardController = new DashboardController();
-  }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initDashboard);
-} else {
-  initDashboard();
-}
+document.addEventListener('DOMContentLoaded', () => {
+  window.dashboardController = new DashboardController();
+});

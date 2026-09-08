@@ -4,11 +4,13 @@
  * Feira FRESQUA 2026
  */
 
+import { DB_CONFIG } from './config.js';
+
 const STORAGE_KEY = 'azurra_fresqua_leads_v1';
 const PAGE_CONFIG_KEY = 'azurra_lead_page_config_v1';
-const COMPANY_WHATSAPP_NUMBER = '551131817744'; // AzurraERP Official WhatsApp (+55 11 3181-7744)
+export const COMPANY_WHATSAPP_NUMBER = '551131817744'; // AzurraERP Official WhatsApp (+55 11 3181-7744)
 
-const DEFAULT_PAGE_CONFIG = {
+export const DEFAULT_PAGE_CONFIG = {
   brandName: 'AzurraERP',
   brandTag: 'FRESQUA 2026',
   badgeText: '✨ Exclusivo Feira de Empreendedorismo FRESQUA',
@@ -184,7 +186,7 @@ const sampleLeads = [
   }
 ];
 
-const StorageManager = {
+export const StorageManager = {
   // Retorna todos os leads salvos no banco JSON local (LocalStorage)
   getLeads() {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -200,7 +202,7 @@ const StorageManager = {
       const hasLula = parsed.some(l => l.name && l.name.toLowerCase().includes('lula'));
       if (hasLula) {
         parsed = parsed.filter(l => !l.name || !l.name.toLowerCase().includes('lula'));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        this.saveLeads(parsed);
       }
 
       return parsed;
@@ -243,145 +245,128 @@ const StorageManager = {
     return sampleLeads;
   },
 
-  // Helper universal para disparar download no navegador (Blob ou Data URI)
-  _downloadFile(content, filename, mimeType) {
+  // Exportar / Baixar arquivo JSON completo (leads.json)
+  exportToJSON() {
     try {
-      if (typeof window !== 'undefined' && window.Blob && window.URL && window.URL.createObjectURL) {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        link.download = filename;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          if (link.parentNode) link.parentNode.removeChild(link);
-          URL.revokeObjectURL(url);
-        }, 3000);
-        return;
-      }
-    } catch (e) {
-      console.warn('Download via Blob falhou, acionando fallback Data URI:', e);
-    }
+      const leads = this.getLeads();
+      const dataStr = JSON.stringify(leads, null, 2);
+      const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.json`;
 
-    // Fallback Data URI universal
-    try {
-      const encodedUri = `data:${mimeType},` + encodeURIComponent(content);
+      const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = encodedUri;
+      link.href = url;
       link.setAttribute('download', filename);
       link.download = filename;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
+
       setTimeout(() => {
         if (link.parentNode) link.parentNode.removeChild(link);
-      }, 3000);
-    } catch (err2) {
-      console.error('Falha crítica ao realizar download:', err2);
-      alert('Erro ao realizar download: ' + err2.message);
+        URL.revokeObjectURL(url);
+      }, 2500);
+    } catch (err) {
+      console.warn('Download via Blob falhou, tentando fallback Data URI:', err);
+      const leads = this.getLeads();
+      const encodedUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(leads, null, 2));
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = encodedUri;
+      fallbackLink.setAttribute('download', 'leads_azurraerp.json');
+      fallbackLink.download = 'leads_azurraerp.json';
+      fallbackLink.style.display = 'none';
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      setTimeout(() => {
+        if (fallbackLink.parentNode) fallbackLink.parentNode.removeChild(fallbackLink);
+      }, 2500);
     }
   },
 
-  // Helper para formatar campos de cada lead de forma estruturada e legível
-  getFormattedLeadDetails(lead) {
-    const painMap = {
-      estoque: 'Controle de Estoque / Perdas',
-      fiscal: 'Emissão Fiscal / SPED / Notas',
-      dre: 'Visibilidade Financeira / DRE',
-      planilhas: 'Excesso de Planilhas Manuais',
-      vendas: 'Lentidão em Vendas / Pedidos'
-    };
+  // Importar arquivo JSON externo (leads.json) para o banco do navegador
+  async importFromJSON(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedLeads = JSON.parse(e.target.result);
+          if (!Array.isArray(importedLeads)) {
+            return reject(new Error('O arquivo selecionado não contém uma lista válida de leads.'));
+          }
 
-    const sysMap = {
-      sem_sistema: 'Sem Sistema (Controle no Papel)',
-      excel: 'Planilhas Excel / Google Sheets',
-      concorrente: 'Outro ERP / Sistema Legado',
-      proprio: 'Sistema Próprio / Interno'
-    };
+          // Mesclar com os leads existentes pelo ID
+          const currentLeads = this.getLeads();
+          const map = new Map();
+          currentLeads.forEach(l => map.set(l.id, l));
+          importedLeads.forEach(l => {
+            if (l && l.id) map.set(l.id, l);
+          });
 
-    const urgMap = {
-      imediato: 'Imediato (Dentro de 15 dias)',
-      '30_dias': 'Em até 30 dias',
-      '60_dias': 'Em até 60 dias',
-      pesquisando: 'Apenas Pesquisando'
-    };
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+          );
 
-    const cleanPhone = (lead.whatsapp || '').replace(/\D/g, '');
-    const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    const waLink = cleanPhone ? `https://wa.me/${phoneWithCountry}` : '';
-
-    const painsList = Array.isArray(lead.pains)
-      ? lead.pains.map(p => painMap[p] || p).join(', ')
-      : (lead.pains || 'Não informado');
-
-    return {
-      id: lead.id || '',
-      date: lead.timestamp ? new Date(lead.timestamp).toLocaleString('pt-BR') : '',
-      name: lead.name || '',
-      company: lead.company || '',
-      role: lead.role || '',
-      whatsapp: lead.whatsapp || '',
-      waLink,
-      email: lead.email || '',
-      segment: lead.segmentLabel || lead.segment || '',
-      revenue: lead.revenueLabel || lead.revenue || '',
-      pains: painsList,
-      system: sysMap[lead.currentSystem] || lead.currentSystem || 'Não informado',
-      urgency: urgMap[lead.urgency] || lead.urgency || 'Não informado',
-      score: lead.score != null ? `${lead.score}%` : '',
-      status: (lead.status || 'COLD').toUpperCase(),
-      monthlyLoss: lead.estimatedMonthlyLoss || 'R$ 0',
-      wastedHours: lead.estimatedMonthlyHours || '0 hrs',
-      notes: (lead.notes || '').trim()
-    };
+          this.saveLeads(merged);
+          resolve({ success: true, count: merged.length, added: importedLeads.length });
+        } catch (err) {
+          reject(new Error('Formato JSON inválido: ' + err.message));
+        }
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler o arquivo selecionado.'));
+      reader.readAsText(file);
+    });
   },
 
-  // Exportar / Baixar arquivo JSON completo (leads.json para backup ou restauração)
-  exportToJSON() {
-    const leads = this.getLeads();
-    const dataStr = JSON.stringify(leads, null, 2);
-    const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.json`;
-    this._downloadFile(dataStr, filename, 'application/json;charset=utf-8');
-  },
-
-  // Exportar leads em planilha nativa do Microsoft Excel (.xls com formatação visual)
+  // Exportar leads em planilha estruturada compatível nativamente com Microsoft Excel (.xls)
   exportToExcel() {
     const leads = this.getLeads();
     if (!leads || leads.length === 0) return alert('Nenhum lead encontrado para exportar.');
 
     const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.xls`;
 
+    const painMap = {
+      estoque: 'Controle de Estoque / Perdas',
+      fiscal: 'Emissão Fiscal / Notas',
+      dre: 'DRE / Gestão Financeira',
+      planilhas: 'Excesso de Planilhas',
+      vendas: 'Lentidão em Vendas'
+    };
+
+    const sysMap = {
+      sem_sistema: 'Sem Sistema (Controle no Papel)',
+      excel: 'Planilhas Excel',
+      concorrente: 'Outro ERP',
+      proprio: 'Sistema Próprio'
+    };
+
     let rowsHtml = '';
     leads.forEach(l => {
-      const d = this.getFormattedLeadDetails(l);
-      const isHot = d.status.includes('HOT');
-      const isWarm = d.status.includes('WARM');
-      const badgeBg = isHot ? '#ffe4e6' : isWarm ? '#fef3c7' : '#d1fae5';
-      const badgeColor = isHot ? '#b91c1c' : isWarm ? '#b45309' : '#047857';
+      const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('pt-BR') : '';
+      const pains = Array.isArray(l.pains) ? l.pains.map(p => painMap[p] || p).join(', ') : (l.pains || '');
+      const system = sysMap[l.currentSystem] || l.currentSystem || '';
+      const status = (l.status || 'COLD').toUpperCase();
+      const statusBg = status.includes('HOT') ? '#ffe4e6' : status.includes('WARM') ? '#fef3c7' : '#d1fae5';
+      const statusColor = status.includes('HOT') ? '#b91c1c' : status.includes('WARM') ? '#b45309' : '#047857';
 
       rowsHtml += `
         <tr>
-          <td>${d.id}</td>
-          <td>${d.date}</td>
-          <td><b>${d.name}</b></td>
-          <td><b>${d.company}</b></td>
-          <td>${d.role}</td>
-          <td style="mso-number-format:'\\@';">${d.whatsapp}</td>
-          <td>${d.waLink ? `<a href="${d.waLink}" target="_blank">Conversar no WhatsApp</a>` : ''}</td>
-          <td>${d.email}</td>
-          <td>${d.segment}</td>
-          <td>${d.revenue}</td>
-          <td>${d.pains}</td>
-          <td>${d.system}</td>
-          <td>${d.urgency}</td>
-          <td style="text-align:center; font-weight:bold;">${d.score}</td>
-          <td style="background-color:${badgeBg}; color:${badgeColor}; font-weight:bold; text-align:center;">${d.status}</td>
-          <td style="color:#dc2626; font-weight:bold;">${d.monthlyLoss}</td>
-          <td>${d.wastedHours}</td>
-          <td>${d.notes}</td>
+          <td>${l.id || ''}</td>
+          <td>${dateStr}</td>
+          <td><b>${l.name || ''}</b></td>
+          <td><b>${l.company || ''}</b></td>
+          <td>${l.role || ''}</td>
+          <td style="mso-number-format:'\\@';">${l.whatsapp || ''}</td>
+          <td>${l.email || ''}</td>
+          <td>${l.segmentLabel || l.segment || ''}</td>
+          <td>${l.revenueLabel || l.revenue || ''}</td>
+          <td>${pains}</td>
+          <td>${system}</td>
+          <td>${l.urgency || ''}</td>
+          <td style="text-align:center; font-weight:bold;">${l.score != null ? l.score + '%' : ''}</td>
+          <td style="background-color:${statusBg}; color:${statusColor}; font-weight:bold; text-align:center;">${status}</td>
+          <td style="color:#dc2626; font-weight:bold;">${l.estimatedMonthlyLoss || ''}</td>
+          <td>${l.estimatedMonthlyHours || ''}</td>
+          <td>${(l.notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
         </tr>
       `;
     });
@@ -390,20 +375,6 @@ const StorageManager = {
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>Leads Feira FRESQUA</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
         <style>
           body { font-family: Calibri, Arial, sans-serif; }
           table { border-collapse: collapse; width: 100%; }
@@ -413,25 +384,24 @@ const StorageManager = {
       </head>
       <body>
         <h2 style="color: #0b132b;">Relatório Comercial de Leads — Stand AzurraERP (Feira FRESQUA)</h2>
-        <p><b>Total de Leads Capturados:</b> ${leads.length} | <b>Data de Extração:</b> ${new Date().toLocaleString('pt-BR')}</p>
+        <p><b>Total de Leads:</b> ${leads.length} | <b>Data de Extração:</b> ${new Date().toLocaleString('pt-BR')}</p>
         <table>
           <thead>
             <tr>
               <th>ID</th>
               <th>Data/Hora</th>
-              <th>Nome do Contato</th>
+              <th>Nome Completo</th>
               <th>Empresa</th>
               <th>Cargo</th>
               <th>WhatsApp</th>
-              <th>Link Direto WhatsApp</th>
               <th>E-mail</th>
               <th>Segmento</th>
               <th>Faturamento Mensal</th>
-              <th>Dores / Gargalos Principais</th>
-              <th>Sistema de Gestão Atual</th>
-              <th>Urgência de Decisão</th>
+              <th>Dores / Gargalos</th>
+              <th>Sistema Atual</th>
+              <th>Urgência</th>
               <th>Score de Eficiência</th>
-              <th>Status / Temperatura</th>
+              <th>Temperatura / Status</th>
               <th>Perda Financeira Estimada</th>
               <th>Horas Desperdiçadas</th>
               <th>Observações do Cliente</th>
@@ -445,66 +415,73 @@ const StorageManager = {
       </html>
     `;
 
-    this._downloadFile(excelHtml, filename, 'application/vnd.ms-excel;charset=utf-8');
+    try {
+      const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 2500);
+    } catch (e) {
+      console.warn('Erro ao gerar blob Excel, usando fallback Data URI:', e);
+      const encodedUri = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(excelHtml);
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = encodedUri;
+      fallbackLink.setAttribute('download', filename);
+      fallbackLink.download = filename;
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      setTimeout(() => {
+        if (fallbackLink.parentNode) fallbackLink.parentNode.removeChild(fallbackLink);
+      }, 2500);
+    }
   },
 
-  // Exportar leads para arquivo CSV estruturado (compatível com Excel, Google Sheets e CRMs)
+  // Exportar leads para arquivo CSV compatível com Excel e Google Sheets
   exportToCSV() {
     const leads = this.getLeads();
-    if (!leads || leads.length === 0) return alert('Nenhum lead encontrado para exportar.');
-
-    const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.csv`;
+    if (!leads || leads.length === 0) return alert('Nenhum lead para exportar.');
 
     const headers = [
-      'ID',
-      'Data/Hora',
-      'Nome Completo',
-      'Empresa',
-      'Cargo',
-      'WhatsApp',
-      'Link WhatsApp Direto',
-      'E-mail',
-      'Segmento',
-      'Faturamento Estimado',
-      'Dores / Gargalos Identificados',
-      'Sistema Atual',
-      'Urgencia de Decisao',
-      'Score Gestao (%)',
-      'Status Temperatura',
-      'Perda Mensal Estimada',
-      'Tempo Desperdicado',
-      'Observacoes Adicionais'
+      'ID', 'Data/Hora', 'Nome', 'Empresa', 'Cargo', 'WhatsApp', 'Email',
+      'Segmento', 'Faturamento', 'Sistema Atual', 'Urgencia', 'Score',
+      'Status Temperatura', 'Perda Mensal Estimada', 'Tempo Desperdiçado', 'Observacoes'
     ];
 
-    const escapeCsv = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
+    const rows = leads.map(l => [
+      `"${l.id}"`,
+      `"${new Date(l.timestamp).toLocaleString('pt-BR')}"`,
+      `"${l.name || ''}"`,
+      `"${l.company || ''}"`,
+      `"${l.role || ''}"`,
+      `"${l.whatsapp || ''}"`,
+      `"${l.email || ''}"`,
+      `"${l.segmentLabel || l.segment || ''}"`,
+      `"${l.revenueLabel || l.revenue || ''}"`,
+      `"${l.currentSystem || ''}"`,
+      `"${l.urgency || ''}"`,
+      `"${l.score}"`,
+      `"${(l.status || '').toUpperCase()}"`,
+      `"${l.estimatedMonthlyLoss || ''}"`,
+      `"${l.estimatedMonthlyHours || ''}"`,
+      `"${(l.notes || '').replace(/"/g, '""')}"`
+    ]);
 
-    const rows = leads.map(l => {
-      const d = this.getFormattedLeadDetails(l);
-      return [
-        escapeCsv(d.id),
-        escapeCsv(d.date),
-        escapeCsv(d.name),
-        escapeCsv(d.company),
-        escapeCsv(d.role),
-        escapeCsv(d.whatsapp),
-        escapeCsv(d.waLink),
-        escapeCsv(d.email),
-        escapeCsv(d.segment),
-        escapeCsv(d.revenue),
-        escapeCsv(d.pains),
-        escapeCsv(d.system),
-        escapeCsv(d.urgency),
-        escapeCsv(d.score),
-        escapeCsv(d.status),
-        escapeCsv(d.monthlyLoss),
-        escapeCsv(d.wastedHours),
-        escapeCsv(d.notes)
-      ].join(';');
-    });
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
+    const encodedUri = encodeURI(csvContent);
 
-    // \uFEFF é o Byte Order Mark (BOM) do UTF-8 que força o Excel abrir com acentuação correta
-    const csvContent = '\uFEFF' + [headers.map(escapeCsv).join(';'), ...rows].join('\r\n');
-    this._downloadFile(csvContent, filename, 'text/csv;charset=utf-8');
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `leads_azurraerp_fresqua_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
 
   // Gerar link de WhatsApp para o CLIENTE falar com a empresa AzurraERP (+55 11 3181-7744)
@@ -619,9 +596,3 @@ const StorageManager = {
     return DEFAULT_PAGE_CONFIG;
   }
 };
-
-if (typeof window !== 'undefined') {
-  window.StorageManager = StorageManager;
-  window.COMPANY_WHATSAPP_NUMBER = COMPANY_WHATSAPP_NUMBER;
-  window.DEFAULT_PAGE_CONFIG = DEFAULT_PAGE_CONFIG;
-}

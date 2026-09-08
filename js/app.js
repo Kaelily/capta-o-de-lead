@@ -2,6 +2,8 @@
  * AzurraERP Lead Capture & Diagnostic Engine (Client App)
  */
 
+import { StorageManager } from './storage.js';
+
 class DiagnosticApp {
   constructor() {
     this.currentStep = 0; // 0 = Welcome, 1..4 = Quiz, 5 = Result
@@ -614,18 +616,7 @@ class DiagnosticApp {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.DiagnosticApp = DiagnosticApp;
-}
-
-function initApp() {
-  if (!window.diagnosticApp) {
-    window.diagnosticApp = new DiagnosticApp();
-  }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-}
+// Initialize on DOM Ready
+document.addEventListener('DOMContentLoaded', () => {
+  window.diagnosticApp = new DiagnosticApp();
+});
