@@ -1,30 +1,31 @@
 /**
- * AzurraERP Lead Capture - Cloud Sync Configuration (Supabase / GitHub)
+ * AzurraERP Lead Capture - Database & API Configuration (Microsoft SQL Server)
  */
 
-export const CLOUD_CONFIG = {
-  // Credenciais ativas da nuvem
-  supabaseUrl: 'https://kldxagdmgiguwezaatie.supabase.co',
-  supabaseAnonKey: 'sb_publishable_S49HGhIbfpVw4wOftXNjvQ_ZMW9UopU',
+export const DB_CONFIG = {
+  // URL base da API conectada ao Microsoft SQL Server
+  apiUrl: localStorage.getItem('azurra_sqlserver_api_url') || (window.location.origin.startsWith('http') ? `${window.location.origin}/api` : 'http://localhost:3000/api'),
   
-  // Define se a nuvem está ativada
+  // Define se a API está configurada
   isConfigured() {
-    return Boolean(this.supabaseUrl && this.supabaseAnonKey);
+    return Boolean(this.apiUrl && this.apiUrl.trim().length > 0);
   },
 
-  // Salvar credenciais alternativas no navegador caso queira trocar
-  save(url, anonKey) {
-    this.supabaseUrl = (url || '').trim().replace(/\/$/, '');
-    this.supabaseAnonKey = (anonKey || '').trim();
-    localStorage.setItem('azurra_supabase_url', this.supabaseUrl);
-    localStorage.setItem('azurra_supabase_anon_key', this.supabaseAnonKey);
+  // Salvar URL customizada da API (ex: IP do servidor na feira: http://192.168.1.50:3000/api)
+  save(url) {
+    this.apiUrl = (url || '').trim().replace(/\/$/, '');
+    if (!this.apiUrl.endsWith('/api') && !this.apiUrl.includes('/api/')) {
+      this.apiUrl = `${this.apiUrl}/api`;
+    }
+    localStorage.setItem('azurra_sqlserver_api_url', this.apiUrl);
   },
 
-  // Limpar credenciais
+  // Limpar e restaurar para padrão
   clear() {
-    this.supabaseUrl = '';
-    this.supabaseAnonKey = '';
-    localStorage.removeItem('azurra_supabase_url');
-    localStorage.removeItem('azurra_supabase_anon_key');
+    localStorage.removeItem('azurra_sqlserver_api_url');
+    this.apiUrl = window.location.origin.startsWith('http') ? `${window.location.origin}/api` : 'http://localhost:3000/api';
   }
 };
+
+// Aliases para compatibilidade retroativa caso algum módulo antigo importe CLOUD_CONFIG
+export const CLOUD_CONFIG = DB_CONFIG;

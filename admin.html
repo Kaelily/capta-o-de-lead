@@ -8,8 +8,6 @@
   <link rel="stylesheet" href="css/styles.css">
   <!-- QRCode Library for QR Modal -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- Supabase Cloud Sync SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -25,9 +23,9 @@
       </a>
 
       <div class="nav-actions">
-        <!-- Cloud Sync Status / Config Button -->
-        <button class="btn-nav" id="btn-cloud-config" title="Configurar Sincronização em Nuvem (GitHub/Supabase)">
-          <span id="cloud-status-indicator">🟡</span> Nuvem: <span id="cloud-status-text">Modo Local</span>
+        <!-- Database Sync Status / Config Button -->
+        <button class="btn-nav" id="btn-cloud-config" title="Configurar Conexão com Microsoft SQL Server">
+          <span id="cloud-status-indicator">🟡</span> Banco: <span id="cloud-status-text">SQL Server</span>
         </button>
 
         <!-- Layout Switcher Button -->
@@ -35,6 +33,9 @@
           🎨 Layout: <span id="layout-name-text">SaaS Dark</span>
         </button>
 
+        <button class="btn-nav" id="btn-customize-page" title="Personalizar Textos, Estatísticas e FAQ da Tela do Cliente">
+          ⚙️ Personalizar Tela de Captura
+        </button>
         <button class="btn-nav" id="btn-show-qr">
           📱 Gerar QR Code do Cliente
         </button>
@@ -129,79 +130,425 @@
     </div>
   </div>
 
-  <!-- Modal de Sincronização em Nuvem (Supabase & GitHub) -->
+  <!-- Modal de Configuração do Microsoft SQL Server -->
   <div id="cloud-modal" class="modal-overlay">
-    <div class="modal-container" style="max-width: 580px; text-align: left;">
+    <div class="modal-container" style="max-width: 620px; text-align: left;">
       <button id="btn-close-cloud-modal" class="modal-close">✕</button>
       <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-        <span style="font-size: 1.8rem;">☁️</span>
+        <span style="font-size: 1.8rem;">🗄️</span>
         <div>
-          <h3 style="font-size: 1.35rem; font-weight: 800; margin: 0;">Sincronização em Nuvem em Tempo Real</h3>
-          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Conecte com seu GitHub no Supabase para receber leads de qualquer celular instantaneamente!</p>
+          <h3 style="font-size: 1.35rem; font-weight: 800; margin: 0;">Integração com Microsoft SQL Server</h3>
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Persistência corporativa de leads no SQL Server com sincronização em tempo real.</p>
         </div>
       </div>
 
       <!-- Quick Steps Guide -->
       <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-glass); border-radius: 10px; padding: 0.85rem; margin: 1rem 0; font-size: 0.85rem;">
-        <p style="margin: 0 0 0.5rem; font-weight: 700; color: var(--accent-cyan);">🚀 Como conectar em 1 minuto com sua conta GitHub:</p>
+        <p style="margin: 0 0 0.5rem; font-weight: 700; color: var(--accent-cyan);">🚀 Como configurar o SQL Server em 2 passos:</p>
         <ol style="margin: 0; padding-left: 1.2rem; line-height: 1.5; color: var(--text-secondary);">
-          <li>Acesse <a href="https://supabase.com" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">supabase.com</a> e clique em <strong>"Continue with GitHub"</strong>.</li>
-          <li>Crie um projeto gratuito e abra o menu <strong>SQL Editor</strong>.</li>
-          <li>Cole o código SQL abaixo e clique em <strong>Run</strong>:</li>
+          <li>Abra o <strong>SSMS</strong> ou <strong>Azure Data Studio</strong>, conecte ao SQL Server e execute o script T-SQL abaixo:</li>
+          <li>No terminal do projeto, execute <code>node server.js</code> (ou <code>npm start</code>) para subir a API de integração.</li>
         </ol>
         <div style="position: relative; margin-top: 0.5rem;">
-          <pre id="sql-code-block" style="background: #040814; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.6rem; border-radius: 6px; font-size: 0.75rem; color: #a5f3fc; overflow-x: auto; max-height: 110px;">create table if not exists leads (
-  id text primary key,
-  timestamp timestamptz default now(),
-  name text,
-  company text,
-  role text,
-  whatsapp text,
-  email text,
-  segment text,
-  "segmentLabel" text,
-  revenue text,
-  "revenueLabel" text,
-  pains jsonb,
-  "currentSystem" text,
-  urgency text,
-  score int,
-  status text,
-  "estimatedMonthlyLoss" text,
-  "estimatedMonthlyHours" text
+          <pre id="sql-code-block" style="background: #040814; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.6rem; border-radius: 6px; font-size: 0.75rem; color: #a5f3fc; overflow-x: auto; max-height: 120px;">CREATE TABLE [dbo].[leads] (
+    [id] VARCHAR(50) NOT NULL PRIMARY KEY,
+    [timestamp] DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+    [name] NVARCHAR(150) NULL,
+    [company] NVARCHAR(150) NULL,
+    [role] NVARCHAR(100) NULL,
+    [whatsapp] VARCHAR(30) NULL,
+    [email] NVARCHAR(150) NULL,
+    [segment] VARCHAR(50) NULL,
+    [segmentLabel] NVARCHAR(100) NULL,
+    [revenue] VARCHAR(50) NULL,
+    [revenueLabel] NVARCHAR(100) NULL,
+    [pains] NVARCHAR(MAX) NULL,
+    [currentSystem] VARCHAR(50) NULL,
+    [urgency] VARCHAR(50) NULL,
+    [score] INT NULL,
+    [status] VARCHAR(20) NULL,
+    [estimatedMonthlyLoss] NVARCHAR(50) NULL,
+    [estimatedMonthlyHours] NVARCHAR(50) NULL,
+    [created_at] DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+    [updated_at] DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
 );
-alter table leads enable row level security;
-create policy "Public Read" on leads for select using (true);
-create policy "Public Insert" on leads for insert with check (true);</pre>
-          <button id="btn-copy-sql" type="button" class="btn-nav" style="position: absolute; top: 6px; right: 6px; padding: 0.2rem 0.6rem; font-size: 0.72rem;">📋 Copiar SQL</button>
+CREATE NONCLUSTERED INDEX [IX_leads_status] ON [dbo].[leads] ([status]);
+CREATE NONCLUSTERED INDEX [IX_leads_timestamp] ON [dbo].[leads] ([timestamp] DESC);</pre>
+          <button id="btn-copy-sql" type="button" class="btn-nav" style="position: absolute; top: 6px; right: 6px; padding: 0.2rem 0.6rem; font-size: 0.72rem;">📋 Copiar T-SQL</button>
         </div>
       </div>
 
-      <!-- Credentials Form -->
+      <!-- Credentials / API Form -->
       <div style="display: flex; flex-direction: column; gap: 0.75rem;">
         <div>
-          <label class="form-label" style="font-size: 0.8rem;">Project URL (ex: https://abcdefghijkl.supabase.co):</label>
-          <input type="text" id="input-supabase-url" class="form-input" placeholder="https://seu-projeto.supabase.co" style="font-size: 0.85rem; padding: 0.55rem 0.8rem;">
-        </div>
-
-        <div>
-          <label class="form-label" style="font-size: 0.8rem;">Project API Key (anon / public):</label>
-          <input type="password" id="input-supabase-key" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-size: 0.85rem; padding: 0.55rem 0.8rem;">
+          <label class="form-label" style="font-size: 0.8rem;">URL da API Node.js (Microsoft SQL Server):</label>
+          <input type="text" id="input-api-url" class="form-input" placeholder="http://localhost:3000/api" style="font-size: 0.85rem; padding: 0.55rem 0.8rem;">
+          <span style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; display: block;">
+            As credenciais do banco (host, usuário, senha) ficam protegidas no arquivo <code>.env</code> do servidor.
+          </span>
         </div>
 
         <div id="cloud-test-status" style="font-size: 0.85rem; min-height: 20px;"></div>
 
         <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; flex-wrap: wrap;">
-          <button id="btn-clear-cloud" class="btn-nav" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">Desconectar</button>
-          <button id="btn-sync-now" class="btn-nav">⬆️ Enviar Leads Locais</button>
+          <button id="btn-clear-cloud" class="btn-nav" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">Restaurar Padrão</button>
+          <button id="btn-sync-now" class="btn-nav">⬆️ Sincronizar Leads Locais</button>
           <button id="btn-save-cloud" class="btn-nav btn-accent">💾 Testar & Salvar Conexão</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Modal de Personalização da Tela de Captura de Lead -->
+  <div id="customize-modal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 780px; text-align: left; max-height: 90vh; overflow-y: auto;">
+      <button id="btn-close-customize-modal" class="modal-close">✕</button>
+      
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem;">
+        <span style="font-size: 1.8rem;">⚙️</span>
+        <div>
+          <h3 style="font-size: 1.4rem; font-weight: 800; margin: 0;">Personalizar Tela de Captura de Lead</h3>
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Altere nomes, títulos, descrições, estatísticas e gerencie a seção de respostas/FAQ em tempo real.</p>
+        </div>
+      </div>
+
+      <!-- Abas de Edição -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem; flex-wrap: wrap;">
+        <button type="button" class="btn-nav btn-tab-customize active" data-tab="general">📝 Textos & Marca</button>
+        <button type="button" class="btn-nav btn-tab-customize" data-tab="stats">📊 Estatísticas Hero</button>
+        <button type="button" class="btn-nav btn-tab-customize" data-tab="steps">📋 Formulário (Etapas 1-4)</button>
+        <button type="button" class="btn-nav btn-tab-customize" data-tab="faq">❓ Seção de FAQ / Respostas</button>
+        <button type="button" class="btn-nav btn-tab-customize" data-tab="result">🎯 Tela Final (Resultado)</button>
+      </div>
+
+      <!-- Formulário de Personalização -->
+      <form id="form-customize-page" onsubmit="return false;">
+
+        <!-- TAB 1: Textos & Marca -->
+        <div id="tab-customize-general" class="customize-tab-content">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <label class="form-label" style="font-size: 0.82rem;">Nome da Marca / Solução:</label>
+              <input type="text" id="cfg-brand-name" class="form-input" placeholder="Ex: AzurraERP">
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 0.82rem;">Tag do Evento / Edição:</label>
+              <input type="text" id="cfg-brand-tag" class="form-input" placeholder="Ex: FRESQUA 2026">
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label class="form-label" style="font-size: 0.82rem;">Badge Superior de Destaque:</label>
+            <input type="text" id="cfg-badge-text" class="form-input" placeholder="Ex: ✨ Exclusivo Feira de Empreendedorismo FRESQUA">
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label class="form-label" style="font-size: 0.82rem;">Título Principal (Hero):</label>
+            <textarea id="cfg-hero-title" class="form-input" rows="2" placeholder="Digite o título principal..."></textarea>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Dica: use <code>&lt;span&gt;texto destacado&lt;/span&gt;</code> para aplicar o gradiente de destaque.</span>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label class="form-label" style="font-size: 0.82rem;">Subtítulo Explicativo (Hero):</label>
+            <textarea id="cfg-hero-subtitle" class="form-input" rows="2" placeholder="Digite o subtítulo..."></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <label class="form-label" style="font-size: 0.82rem;">Texto do Botão Inicial:</label>
+              <input type="text" id="cfg-btn-start" class="form-input" placeholder="Ex: Iniciar Diagnóstico Gratuito ➔">
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 0.82rem;">URL da Imagem / Logo (Opcional):</label>
+              <input type="url" id="cfg-hero-image" class="form-input" placeholder="https://exemplo.com/logo.png">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Estatísticas Hero -->
+        <div id="tab-customize-stats" class="customize-tab-content" style="display: none;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">Personalize os 3 blocos de destaque exibidos na tela inicial:</p>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <!-- Stat 1 -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.85rem;">
+              <h4 style="margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Destaque 1</h4>
+              <label class="form-label" style="font-size: 0.75rem;">Valor/Destaque:</label>
+              <input type="text" id="cfg-stat-num-0" class="form-input" style="font-size: 0.85rem; margin-bottom: 0.5rem;" placeholder="Ex: 60 seg">
+              <label class="form-label" style="font-size: 0.75rem;">Descrição:</label>
+              <input type="text" id="cfg-stat-label-0" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: Duração do Diagnóstico">
+            </div>
+
+            <!-- Stat 2 -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.85rem;">
+              <h4 style="margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Destaque 2</h4>
+              <label class="form-label" style="font-size: 0.75rem;">Valor/Destaque:</label>
+              <input type="text" id="cfg-stat-num-1" class="form-input" style="font-size: 0.85rem; margin-bottom: 0.5rem;" placeholder="Ex: +40%">
+              <label class="form-label" style="font-size: 0.75rem;">Descrição:</label>
+              <input type="text" id="cfg-stat-label-1" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: Eficiência Média Ganha">
+            </div>
+
+            <!-- Stat 3 -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.85rem;">
+              <h4 style="margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Destaque 3</h4>
+              <label class="form-label" style="font-size: 0.75rem;">Valor/Destaque:</label>
+              <input type="text" id="cfg-stat-num-2" class="form-input" style="font-size: 0.85rem; margin-bottom: 0.5rem;" placeholder="Ex: Isenção">
+              <label class="form-label" style="font-size: 0.75rem;">Descrição:</label>
+              <input type="text" id="cfg-stat-label-2" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: De Taxa de Implantação">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Formulário (Etapas 1 a 4) -->
+        <div id="tab-customize-steps" class="customize-tab-content" style="display: none;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">Personalize os títulos, perguntas e opções de cada etapa do quiz:</p>
+
+          <!-- Sub-abas das Etapas -->
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn-nav btn-subtab-step active" data-step="1">1️⃣ Etapa 1</button>
+            <button type="button" class="btn-nav btn-subtab-step" data-step="2">2️⃣ Etapa 2</button>
+            <button type="button" class="btn-nav btn-subtab-step" data-step="3">3️⃣ Etapa 3</button>
+            <button type="button" class="btn-nav btn-subtab-step" data-step="4">4️⃣ Etapa 4</button>
+          </div>
+
+          <!-- STEP 1 CONFIG -->
+          <div id="step-config-1" class="step-config-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Título da Etapa 1:</label>
+                <input type="text" id="cfg-step1-title" class="form-input" placeholder="Ex: Qual é o perfil da sua empresa?">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Subtítulo da Etapa 1:</label>
+                <input type="text" id="cfg-step1-subtitle" class="form-input" placeholder="Ex: Selecione seu segmento...">
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label class="form-label" style="font-size: 0.8rem;">Pergunta 1 (Segmentos):</label>
+              <input type="text" id="cfg-step1-q1-label" class="form-input" placeholder="Ex: 1. Qual o segmento de atuação...">
+            </div>
+
+            <h4 style="margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Opções de Segmento (Ícone, Título, Descrição):</h4>
+            <div id="editor-segments-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; max-height: 200px; overflow-y: auto;">
+              <!-- Segments rendered by JS -->
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label class="form-label" style="font-size: 0.8rem;">Pergunta 2 (Faturamento):</label>
+              <input type="text" id="cfg-step1-q2-label" class="form-input" placeholder="Ex: 2. Qual o faturamento bruto mensal...">
+            </div>
+
+            <h4 style="margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Opções de Faturamento:</h4>
+            <div id="editor-revenues-container" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+              <!-- Revenues rendered by JS -->
+            </div>
+          </div>
+
+          <!-- STEP 2 CONFIG -->
+          <div id="step-config-2" class="step-config-body" style="display: none;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Título da Etapa 2:</label>
+                <input type="text" id="cfg-step2-title" class="form-input" placeholder="Ex: Quais são os principais gargalos...">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Subtítulo da Etapa 2:</label>
+                <input type="text" id="cfg-step2-subtitle" class="form-input" placeholder="Ex: Selecione todas as opções...">
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label class="form-label" style="font-size: 0.8rem;">Rótulo de Instrução:</label>
+              <input type="text" id="cfg-step2-instruction" class="form-input" placeholder="Ex: Marque os gargalos que mais impactam...">
+            </div>
+
+            <h4 style="margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Opções de Gargalos / Dores Operacionais:</h4>
+            <div id="editor-pains-container" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto;">
+              <!-- Pains rendered by JS -->
+            </div>
+          </div>
+
+          <!-- STEP 3 CONFIG -->
+          <div id="step-config-3" class="step-config-body" style="display: none;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Título da Etapa 3:</label>
+                <input type="text" id="cfg-step3-title" class="form-input" placeholder="Ex: Como você controla seu negócio...">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Subtítulo da Etapa 3:</label>
+                <input type="text" id="cfg-step3-subtitle" class="form-input" placeholder="Ex: Indique suas ferramentas...">
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label class="form-label" style="font-size: 0.8rem;">Pergunta 1 (Sistema Atual):</label>
+              <input type="text" id="cfg-step3-q1-label" class="form-input" placeholder="Ex: 1. Como você controla sua gestão hoje?">
+            </div>
+
+            <h4 style="margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Opções de Sistema Atual:</h4>
+            <div id="editor-systems-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; max-height: 180px; overflow-y: auto;">
+              <!-- Systems rendered by JS -->
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label class="form-label" style="font-size: 0.8rem;">Pergunta 2 (Prazo / Urgência):</label>
+              <input type="text" id="cfg-step3-q2-label" class="form-input" placeholder="Ex: 2. Em quanto tempo pretende implementar...">
+            </div>
+
+            <h4 style="margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Opções de Urgência / Prazo:</h4>
+            <div id="editor-urgencies-container" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 180px; overflow-y: auto;">
+              <!-- Urgencies rendered by JS -->
+            </div>
+          </div>
+
+          <!-- STEP 4 CONFIG -->
+          <div id="step-config-4" class="step-config-body" style="display: none;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Título da Etapa 4:</label>
+                <input type="text" id="cfg-step4-title" class="form-input" placeholder="Ex: Quase pronto! Onde enviamos seu Raio-X?">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.8rem;">Subtítulo da Etapa 4:</label>
+                <input type="text" id="cfg-step4-subtitle" class="form-input" placeholder="Ex: Preencha seus dados de contato...">
+              </div>
+            </div>
+
+            <h4 style="margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--accent-cyan);">Rótulos e Placeholders dos Campos:</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Rótulo Campo Nome:</label>
+                <input type="text" id="cfg-step4-name-label" class="form-input" style="font-size: 0.85rem;" placeholder="Seu Nome Completo *">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Placeholder Nome:</label>
+                <input type="text" id="cfg-step4-name-ph" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: Roberto Silva">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Rótulo Campo WhatsApp:</label>
+                <input type="text" id="cfg-step4-zap-label" class="form-input" style="font-size: 0.85rem;" placeholder="WhatsApp com DDD *">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Placeholder WhatsApp:</label>
+                <input type="text" id="cfg-step4-zap-ph" class="form-input" style="font-size: 0.85rem;" placeholder="(11) 99999-9999">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Rótulo Campo Empresa:</label>
+                <input type="text" id="cfg-step4-company-label" class="form-input" style="font-size: 0.85rem;" placeholder="Nome da Sua Empresa *">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Placeholder Empresa:</label>
+                <input type="text" id="cfg-step4-company-ph" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: Silva Comercial">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Rótulo Campo Cargo:</label>
+                <input type="text" id="cfg-step4-role-label" class="form-input" style="font-size: 0.85rem;" placeholder="Seu Cargo na Empresa">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Placeholder Cargo:</label>
+                <input type="text" id="cfg-step4-role-ph" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: Sócio, Diretor, Gerente">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Rótulo Campo E-mail:</label>
+                <input type="text" id="cfg-step4-email-label" class="form-input" style="font-size: 0.85rem;" placeholder="E-mail Corporativo">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Placeholder E-mail:</label>
+                <input type="text" id="cfg-step4-email-ph" class="form-input" style="font-size: 0.85rem;" placeholder="seuemail@empresa.com.br">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Rótulo Campo Observação:</label>
+                <input type="text" id="cfg-step4-notes-label" class="form-input" style="font-size: 0.85rem;" placeholder="Observações / Informações Adicionais">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Placeholder Observação:</label>
+                <input type="text" id="cfg-step4-notes-ph" class="form-input" style="font-size: 0.85rem;" placeholder="Ex: Conte um pouco mais sobre sua necessidade...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: Seção de FAQ / Respostas -->
+        <div id="tab-customize-faq" class="customize-tab-content" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 700; cursor: pointer;">
+              <input type="checkbox" id="cfg-faq-enabled" style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
+              Exibir Seção de Perguntas e Respostas (FAQ) na Tela de Captura
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <label class="form-label" style="font-size: 0.82rem;">Título da Seção FAQ:</label>
+              <input type="text" id="cfg-faq-title" class="form-input" placeholder="Ex: Perguntas Frequentes & Como Funciona">
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 0.82rem;">Subtítulo da Seção FAQ:</label>
+              <input type="text" id="cfg-faq-subtitle" class="form-input" placeholder="Ex: Tire suas dúvidas...">
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 0.75rem;">
+            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800;">Perguntas e Respostas Cadastradas</h4>
+            <button type="button" id="btn-add-faq-item" class="btn-nav" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; color: var(--accent-cyan); border-color: rgba(0, 242, 254, 0.3);">
+              ➕ Adicionar Pergunta
+            </button>
+          </div>
+
+          <!-- Container da Lista de FAQs -->
+          <div id="faq-items-editor-container" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 280px; overflow-y: auto; padding-right: 4px;">
+            <!-- FAQ Rows Inserted via JS -->
+          </div>
+        </div>
+
+        <!-- TAB 5: Tela Final (Resultado) -->
+        <div id="tab-customize-result" class="customize-tab-content" style="display: none;">
+          <div style="margin-bottom: 1.25rem;">
+            <label class="form-label" style="font-size: 0.85rem;">Texto Descritivo da Tela Final:</label>
+            <textarea id="cfg-result-offer-desc" class="form-input" rows="3" style="font-size: 0.88rem; line-height: 1.5;" placeholder="Ex: Nossos consultores no Stand AzurraERP estão prontos para te apresentar a plataforma em funcionamento."></textarea>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label class="form-label" style="font-size: 0.85rem;">Texto do Botão Principal CTA (WhatsApp / Stand):</label>
+            <input type="text" id="cfg-result-btn-whatsapp" class="form-input" placeholder="Ex: 💬 Receber Relatório no WhatsApp & Agendar no Stand">
+          </div>
+        </div>
+
+        <!-- Rodapé do Modal com Botões de Ação -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); margin-top: 1.5rem; padding-top: 1rem;">
+          <button type="button" id="btn-reset-customize-page" class="btn-nav" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+            🔄 Restaurar Padrão
+          </button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="btn-cancel-customize-page" class="btn-nav">Cancelar</button>
+            <button type="button" id="btn-save-customize-page" class="btn-nav btn-accent">💾 Salvar Alterações</button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification Container para alertas em tempo real -->
   <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
+
 
   <script type="module" src="js/storage.js"></script>
   <script type="module" src="js/dashboard.js"></script>

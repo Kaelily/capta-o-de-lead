@@ -3,7 +3,7 @@
  */
 
 import { StorageManager } from './storage.js';
-import { CLOUD_CONFIG } from './config.js';
+import { DB_CONFIG } from './config.js';
 
 export class DashboardController {
   constructor() {
@@ -39,8 +39,7 @@ export class DashboardController {
     this.cloudStatusText = document.getElementById('cloud-status-text');
     this.cloudModal = document.getElementById('cloud-modal');
     this.btnCloseCloudModal = document.getElementById('btn-close-cloud-modal');
-    this.inputSupabaseUrl = document.getElementById('input-supabase-url');
-    this.inputSupabaseKey = document.getElementById('input-supabase-key');
+    this.inputApiUrl = document.getElementById('input-api-url');
     this.btnSaveCloud = document.getElementById('btn-save-cloud');
     this.btnClearCloud = document.getElementById('btn-clear-cloud');
     this.btnSyncNow = document.getElementById('btn-sync-now');
@@ -52,6 +51,17 @@ export class DashboardController {
     this.inputSearchLead = document.getElementById('input-search-lead');
     this.inputQRUrl = document.getElementById('input-qr-url');
     this.qrCodeImg = document.getElementById('qr-code-img');
+
+    // Customize Modal Elements
+    this.btnCustomizePage = document.getElementById('btn-customize-page');
+    this.customizeModal = document.getElementById('customize-modal');
+    this.btnCloseCustomizeModal = document.getElementById('btn-close-customize-modal');
+    this.btnCancelCustomizePage = document.getElementById('btn-cancel-customize-page');
+    this.btnSaveCustomizePage = document.getElementById('btn-save-customize-page');
+    this.btnResetCustomizePage = document.getElementById('btn-reset-customize-page');
+    this.btnAddFaqItem = document.getElementById('btn-add-faq-item');
+    this.faqItemsContainer = document.getElementById('faq-items-editor-container');
+    this.tabButtonsCustomize = document.querySelectorAll('.btn-tab-customize');
 
     this.renderMetrics();
     this.renderLeadsTable();
@@ -80,11 +90,11 @@ export class DashboardController {
   }
 
   initCloudStatus() {
-    const isConfigured = CLOUD_CONFIG.isConfigured();
+    const isConfigured = DB_CONFIG.isConfigured();
     if (this.cloudStatusIndicator && this.cloudStatusText) {
       if (isConfigured) {
         this.cloudStatusIndicator.innerText = '🟢';
-        this.cloudStatusText.innerText = 'Nuvem Ativa';
+        this.cloudStatusText.innerText = 'SQL Server';
         this.cloudStatusText.style.color = '#10b981';
       } else {
         this.cloudStatusIndicator.innerText = '🟡';
@@ -93,26 +103,23 @@ export class DashboardController {
       }
     }
 
-    if (this.inputSupabaseUrl && CLOUD_CONFIG.supabaseUrl) {
-      this.inputSupabaseUrl.value = CLOUD_CONFIG.supabaseUrl;
-    }
-    if (this.inputSupabaseKey && CLOUD_CONFIG.supabaseAnonKey) {
-      this.inputSupabaseKey.value = CLOUD_CONFIG.supabaseAnonKey;
+    if (this.inputApiUrl && DB_CONFIG.apiUrl) {
+      this.inputApiUrl.value = DB_CONFIG.apiUrl;
     }
   }
 
   async initCloudSync() {
-    if (CLOUD_CONFIG.isConfigured()) {
-      // 1. Busca todos os leads já gravados na nuvem
-      console.log('📡 Buscando leads atualizados na nuvem...');
+    if (DB_CONFIG.isConfigured()) {
+      // 1. Busca todos os leads já gravados no SQL Server
+      console.log('📡 Buscando leads atualizados no Microsoft SQL Server...');
       const freshLeads = await StorageManager.fetchCloudLeads();
       this.renderMetrics();
       this.renderLeadsTable();
 
-      // 2. Ouve novos leads e exclusões em tempo real
+      // 2. Ouve novos leads e exclusões em tempo real via polling
       StorageManager.subscribeToLeads(
         (newLead) => {
-          this.showToast(`🔥 Novo Lead do Celular: <strong>${newLead.name || 'Novo contato'}</strong> (${newLead.company || 'Empresa'})!`);
+          this.showToast(`🔥 Novo Lead no SQL Server: <strong>${newLead.name || 'Novo contato'}</strong> (${newLead.company || 'Empresa'})!`);
           this.renderMetrics();
           this.renderLeadsTable();
         },
@@ -206,6 +213,64 @@ export class DashboardController {
         this.renderLeadsTable();
       });
     }
+
+    // Customize Modal Events
+    if (this.btnCustomizePage) {
+      this.btnCustomizePage.addEventListener('click', () => this.toggleCustomizeModal(true));
+    }
+
+    if (this.btnCloseCustomizeModal) {
+      this.btnCloseCustomizeModal.addEventListener('click', () => this.toggleCustomizeModal(false));
+    }
+
+    if (this.btnCancelCustomizePage) {
+      this.btnCancelCustomizePage.addEventListener('click', () => this.toggleCustomizeModal(false));
+    }
+
+    if (this.customizeModal) {
+      this.customizeModal.addEventListener('click', (e) => {
+        if (e.target === this.customizeModal) this.toggleCustomizeModal(false);
+      });
+    }
+
+    if (this.tabButtonsCustomize) {
+      this.tabButtonsCustomize.forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.tabButtonsCustomize.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const tabName = btn.dataset.tab;
+          document.querySelectorAll('.customize-tab-content').forEach(c => c.style.display = 'none');
+          const activeTab = document.getElementById(`tab-customize-${tabName}`);
+          if (activeTab) activeTab.style.display = 'block';
+        });
+      });
+    }
+
+    if (this.btnAddFaqItem) {
+      this.btnAddFaqItem.addEventListener('click', () => this.addFaqEditorItem());
+    }
+
+    if (this.btnSaveCustomizePage) {
+      this.btnSaveCustomizePage.addEventListener('click', () => this.saveCustomizePage());
+    }
+
+    if (this.btnResetCustomizePage) {
+      this.btnResetCustomizePage.addEventListener('click', () => this.resetCustomizePage());
+    }
+
+    const subtabStepBtns = document.querySelectorAll('.btn-subtab-step');
+    if (subtabStepBtns) {
+      subtabStepBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          subtabStepBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const stepNum = btn.dataset.step;
+          document.querySelectorAll('.step-config-body').forEach(c => c.style.display = 'none');
+          const activeStepBody = document.getElementById(`step-config-${stepNum}`);
+          if (activeStepBody) activeStepBody.style.display = 'block';
+        });
+      });
+    }
   }
 
   toggleCloudModal(show) {
@@ -220,22 +285,21 @@ export class DashboardController {
   }
 
   async handleSaveCloud() {
-    const url = (this.inputSupabaseUrl?.value || '').trim();
-    const key = (this.inputSupabaseKey?.value || '').trim();
+    const url = (this.inputApiUrl?.value || '').trim();
 
-    if (!url || !key) {
-      this.setCloudStatusMessage('Por favor, informe a URL do projeto e a chave API (anon).', '#ef4444');
+    if (!url) {
+      this.setCloudStatusMessage('Por favor, informe a URL da API Node.js (ex: http://localhost:3000/api).', '#ef4444');
       return;
     }
 
-    this.setCloudStatusMessage('Testando conexão com o Supabase...', '#00f2fe');
+    this.setCloudStatusMessage('Testando conexão com a API e o SQL Server...', '#00f2fe');
 
-    const result = await StorageManager.testCloudConnection(url, key);
+    const result = await StorageManager.testCloudConnection(url);
     if (result.success) {
-      CLOUD_CONFIG.save(url, key);
+      DB_CONFIG.save(url);
       this.initCloudStatus();
       this.setCloudStatusMessage('✅ ' + result.message, '#10b981');
-      this.showToast('Nuvem Supabase conectada com sucesso! Atualizando leads...');
+      this.showToast('SQL Server conectado com sucesso! Atualizando leads...');
       await this.initCloudSync();
       setTimeout(() => this.toggleCloudModal(false), 1500);
     } else {
@@ -244,26 +308,25 @@ export class DashboardController {
   }
 
   handleClearCloud() {
-    if (confirm('Deseja realmente desconectar a sincronização em nuvem e voltar ao modo local?')) {
-      CLOUD_CONFIG.clear();
+    if (confirm('Deseja restaurar a URL padrão da API do SQL Server (http://localhost:3000/api)?')) {
+      DB_CONFIG.clear();
       this.initCloudStatus();
-      if (this.inputSupabaseUrl) this.inputSupabaseUrl.value = '';
-      if (this.inputSupabaseKey) this.inputSupabaseKey.value = '';
-      this.setCloudStatusMessage('Nuvem desconectada. Operando em Modo Local.', '#f59e0b');
-      this.showToast('Operando em modo local');
+      if (this.inputApiUrl) this.inputApiUrl.value = DB_CONFIG.apiUrl;
+      this.setCloudStatusMessage('URL da API restaurada para o padrão.', '#10b981');
+      this.showToast('Configuração restaurada');
     }
   }
 
   async handleSyncLocalToCloud() {
-    if (!CLOUD_CONFIG.isConfigured()) {
-      this.setCloudStatusMessage('Conecte a nuvem primeiro para enviar os leads locais.', '#f59e0b');
+    if (!DB_CONFIG.isConfigured()) {
+      this.setCloudStatusMessage('Configure a URL da API antes de sincronizar.', '#f59e0b');
       return;
     }
-    this.setCloudStatusMessage('Enviando leads locais para o Supabase...', '#00f2fe');
+    this.setCloudStatusMessage('Enviando leads locais para o Microsoft SQL Server...', '#00f2fe');
     try {
       const count = await StorageManager.syncLocalToCloud();
-      this.setCloudStatusMessage(`✅ ${count} leads enviados para a nuvem com sucesso!`, '#10b981');
-      this.showToast(`${count} leads sincronizados com o Supabase!`);
+      this.setCloudStatusMessage(`✅ ${count} leads sincronizados no SQL Server com sucesso!`, '#10b981');
+      this.showToast(`${count} leads sincronizados com o SQL Server!`);
     } catch (err) {
       this.setCloudStatusMessage(`Erro ao sincronizar: ${err.message}`, '#ef4444');
     }
@@ -366,6 +429,7 @@ export class DashboardController {
         <td>
           <div style="font-weight: 700; color: var(--text-primary);">${lead.name || 'Sem nome'}</div>
           <div style="font-size: 0.78rem; color: var(--text-muted);">${lead.role || 'Visitante'}</div>
+          ${lead.notes ? `<div style="font-size: 0.75rem; color: #38bdf8; margin-top: 0.25rem; font-style: italic; max-width: 220px;" title="${this.escapeHtml(lead.notes)}">📝 "${this.escapeHtml(lead.notes)}"</div>` : ''}
         </td>
         <td>
           <div style="font-weight: 600;">${lead.company || '-'}</div>
@@ -456,6 +520,420 @@ export class DashboardController {
       const encoded = encodeURIComponent(url.trim());
       this.qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encoded}&color=070c19&bgcolor=ffffff`;
     }
+  }
+
+  toggleCustomizeModal(show) {
+    if (this.customizeModal) {
+      if (show) {
+        this.populateCustomizeForm();
+        this.customizeModal.classList.add('active');
+      } else {
+        this.customizeModal.classList.remove('active');
+      }
+    }
+  }
+
+  populateCustomizeForm() {
+    const config = StorageManager.getPageConfig();
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val || '';
+    };
+
+    setVal('cfg-brand-name', config.brandName);
+    setVal('cfg-brand-tag', config.brandTag);
+    setVal('cfg-badge-text', config.badgeText);
+    setVal('cfg-hero-title', config.heroTitle);
+    setVal('cfg-hero-subtitle', config.heroSubtitle);
+    setVal('cfg-btn-start', config.btnStartText);
+    setVal('cfg-hero-image', config.heroImage);
+
+    // Stats
+    if (config.stats && Array.isArray(config.stats)) {
+      config.stats.forEach((st, i) => {
+        setVal(`cfg-stat-num-${i}`, st.number);
+        setVal(`cfg-stat-label-${i}`, st.label);
+      });
+    }
+
+    // FAQ Settings
+    const chkFaq = document.getElementById('cfg-faq-enabled');
+    if (chkFaq) chkFaq.checked = config.faqEnabled !== false;
+    setVal('cfg-faq-title', config.faqTitle);
+    setVal('cfg-faq-subtitle', config.faqSubtitle);
+
+    // FAQ Items
+    this.renderFaqEditorItems(config.faqs || []);
+
+    // Steps 1 to 4 Settings
+    const steps = config.steps || {};
+    const s1 = steps.step1 || {};
+    setVal('cfg-step1-title', s1.title);
+    setVal('cfg-step1-subtitle', s1.subtitle);
+    setVal('cfg-step1-q1-label', s1.questionSegmentLabel);
+    setVal('cfg-step1-q2-label', s1.questionRevenueLabel);
+    this.renderSegmentsEditor(s1.segments || []);
+    this.renderRevenuesEditor(s1.revenues || []);
+
+    const s2 = steps.step2 || {};
+    setVal('cfg-step2-title', s2.title);
+    setVal('cfg-step2-subtitle', s2.subtitle);
+    setVal('cfg-step2-instruction', s2.instructionLabel);
+    this.renderPainsEditor(s2.pains || []);
+
+    const s3 = steps.step3 || {};
+    setVal('cfg-step3-title', s3.title);
+    setVal('cfg-step3-subtitle', s3.subtitle);
+    setVal('cfg-step3-q1-label', s3.questionCurrentSystemLabel);
+    setVal('cfg-step3-q2-label', s3.questionUrgencyLabel);
+    this.renderSystemsEditor(s3.currentSystems || []);
+    this.renderUrgenciesEditor(s3.urgencies || []);
+
+    const s4 = steps.step4 || {};
+    setVal('cfg-step4-title', s4.title);
+    setVal('cfg-step4-subtitle', s4.subtitle);
+    setVal('cfg-step4-name-label', s4.nameLabel);
+    setVal('cfg-step4-name-ph', s4.namePlaceholder);
+    setVal('cfg-step4-zap-label', s4.whatsappLabel);
+    setVal('cfg-step4-zap-ph', s4.whatsappPlaceholder);
+    setVal('cfg-step4-company-label', s4.companyLabel);
+    setVal('cfg-step4-company-ph', s4.companyPlaceholder);
+    setVal('cfg-step4-role-label', s4.roleLabel);
+    setVal('cfg-step4-role-ph', s4.rolePlaceholder);
+    setVal('cfg-step4-email-label', s4.emailLabel);
+    setVal('cfg-step4-email-ph', s4.emailPlaceholder);
+    setVal('cfg-step4-notes-label', s4.notesLabel);
+    setVal('cfg-step4-notes-ph', s4.notesPlaceholder);
+
+    // Result Screen Settings
+    const res = config.resultScreen || {};
+    setVal('cfg-result-offer-desc', res.offerDesc);
+    setVal('cfg-result-btn-whatsapp', res.btnWhatsappText);
+  }
+
+  renderFaqEditorItems(faqs) {
+    if (!this.faqItemsContainer) return;
+    this.faqItemsContainer.innerHTML = '';
+
+    if (faqs.length === 0) {
+      this.faqItemsContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 1rem; font-size: 0.85rem;">
+          Nenhuma pergunta cadastrada. Clique em "➕ Adicionar Pergunta" acima.
+        </div>
+      `;
+      return;
+    }
+
+    faqs.forEach((faq, index) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'faq-editor-item';
+      itemEl.dataset.id = faq.id || `faq-${index}-${Date.now()}`;
+      itemEl.innerHTML = `
+        <div class="faq-editor-item-header">
+          <span class="faq-editor-title">Pergunta ${index + 1}</span>
+          <button type="button" class="btn-delete-faq" title="Apagar esta pergunta">🗑️ Apagar</button>
+        </div>
+        <div style="margin-bottom: 0.5rem;">
+          <input type="text" class="form-input faq-question-input" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;" placeholder="Pergunta" value="${this.escapeHtml(faq.question || '')}">
+        </div>
+        <div>
+          <textarea class="form-input faq-answer-input" rows="2" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;" placeholder="Resposta">${this.escapeHtml(faq.answer || '')}</textarea>
+        </div>
+      `;
+
+      itemEl.querySelector('.btn-delete-faq').addEventListener('click', () => {
+        itemEl.remove();
+        if (this.faqItemsContainer.children.length === 0) {
+          this.renderFaqEditorItems([]);
+        }
+      });
+
+      this.faqItemsContainer.appendChild(itemEl);
+    });
+  }
+
+  addFaqEditorItem() {
+    if (!this.faqItemsContainer) return;
+    
+    // Remove empty notice if present
+    const emptyNotice = this.faqItemsContainer.querySelector('div[style*="text-align: center"]');
+    if (emptyNotice) emptyNotice.remove();
+
+    const newIndex = this.faqItemsContainer.querySelectorAll('.faq-editor-item').length + 1;
+    const itemEl = document.createElement('div');
+    itemEl.className = 'faq-editor-item';
+    itemEl.dataset.id = `faq-new-${Date.now()}`;
+    itemEl.innerHTML = `
+      <div class="faq-editor-item-header">
+        <span class="faq-editor-title">Pergunta ${newIndex}</span>
+        <button type="button" class="btn-delete-faq" title="Apagar esta pergunta">🗑️ Apagar</button>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <input type="text" class="form-input faq-question-input" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;" placeholder="Digite a nova pergunta..." value="">
+      </div>
+      <div>
+        <textarea class="form-input faq-answer-input" rows="2" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;" placeholder="Digite a resposta detalhada..."></textarea>
+      </div>
+    `;
+
+    itemEl.querySelector('.btn-delete-faq').addEventListener('click', () => {
+      itemEl.remove();
+    });
+
+    this.faqItemsContainer.appendChild(itemEl);
+    itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  renderSegmentsEditor(segments) {
+    const container = document.getElementById('editor-segments-container');
+    if (!container) return;
+    container.innerHTML = '';
+    segments.forEach((seg) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display: grid; grid-template-columns: 50px 1fr 1.5fr; gap: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 6px; align-items: center; margin-bottom: 0.3rem;';
+      row.dataset.value = seg.value;
+      row.innerHTML = `
+        <input type="text" class="form-input seg-icon" style="font-size: 0.85rem; text-align: center; padding: 0.35rem;" value="${this.escapeHtml(seg.icon || '🛍️')}">
+        <input type="text" class="form-input seg-title" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(seg.title || '')}" placeholder="Título">
+        <input type="text" class="form-input seg-desc" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(seg.desc || '')}" placeholder="Descrição">
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  renderRevenuesEditor(revenues) {
+    const container = document.getElementById('editor-revenues-container');
+    if (!container) return;
+    container.innerHTML = '';
+    revenues.forEach((rev) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 6px; margin-bottom: 0.3rem;';
+      row.dataset.value = rev.value;
+      row.innerHTML = `
+        <input type="text" class="form-input rev-title" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(rev.title || '')}" placeholder="Título do faturamento">
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  renderPainsEditor(pains) {
+    const container = document.getElementById('editor-pains-container');
+    if (!container) return;
+    container.innerHTML = '';
+    pains.forEach((p) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display: grid; grid-template-columns: 50px 1fr 1.5fr; gap: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 6px; align-items: center; margin-bottom: 0.3rem;';
+      row.dataset.value = p.value;
+      row.innerHTML = `
+        <input type="text" class="form-input pain-icon" style="font-size: 0.85rem; text-align: center; padding: 0.35rem;" value="${this.escapeHtml(p.icon || '📦')}">
+        <input type="text" class="form-input pain-title" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(p.title || '')}" placeholder="Título da dor">
+        <input type="text" class="form-input pain-desc" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(p.desc || '')}" placeholder="Descrição da dor">
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  renderSystemsEditor(systems) {
+    const container = document.getElementById('editor-systems-container');
+    if (!container) return;
+    container.innerHTML = '';
+    systems.forEach((sys) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 6px; margin-bottom: 0.3rem;';
+      row.dataset.value = sys.value;
+      row.innerHTML = `
+        <input type="text" class="form-input sys-title" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(sys.title || '')}" placeholder="Sistema atual">
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  renderUrgenciesEditor(urgencies) {
+    const container = document.getElementById('editor-urgencies-container');
+    if (!container) return;
+    container.innerHTML = '';
+    urgencies.forEach((urg) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'background: rgba(255,255,255,0.02); padding: 0.4rem; border-radius: 6px; margin-bottom: 0.3rem;';
+      row.dataset.value = urg.value;
+      row.innerHTML = `
+        <input type="text" class="form-input urg-title" style="font-size: 0.85rem; padding: 0.35rem;" value="${this.escapeHtml(urg.title || '')}" placeholder="Prazo de urgência">
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  saveCustomizePage() {
+    const getVal = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    };
+
+    // Build Stats array
+    const stats = [];
+    for (let i = 0; i < 3; i++) {
+      stats.push({
+        number: getVal(`cfg-stat-num-${i}`),
+        label: getVal(`cfg-stat-label-${i}`)
+      });
+    }
+
+    // Build FAQ array from DOM editor
+    const faqs = [];
+    if (this.faqItemsContainer) {
+      const items = this.faqItemsContainer.querySelectorAll('.faq-editor-item');
+      items.forEach((item, index) => {
+        const qInput = item.querySelector('.faq-question-input');
+        const aInput = item.querySelector('.faq-answer-input');
+        const qText = qInput ? qInput.value.trim() : '';
+        const aText = aInput ? aInput.value.trim() : '';
+
+        if (qText || aText) {
+          faqs.push({
+            id: item.dataset.id || `faq-${index}-${Date.now()}`,
+            question: qText,
+            answer: aText
+          });
+        }
+      });
+    }
+
+    // Extract Steps Configs
+    const segments = [];
+    document.querySelectorAll('#editor-segments-container > div').forEach(row => {
+      segments.push({
+        value: row.dataset.value,
+        icon: row.querySelector('.seg-icon')?.value.trim() || '🛍️',
+        title: row.querySelector('.seg-title')?.value.trim() || '',
+        label: row.querySelector('.seg-title')?.value.trim() || '',
+        desc: row.querySelector('.seg-desc')?.value.trim() || ''
+      });
+    });
+
+    const revenues = [];
+    document.querySelectorAll('#editor-revenues-container > div').forEach(row => {
+      revenues.push({
+        value: row.dataset.value,
+        title: row.querySelector('.rev-title')?.value.trim() || '',
+        label: row.querySelector('.rev-title')?.value.trim() || ''
+      });
+    });
+
+    const pains = [];
+    document.querySelectorAll('#editor-pains-container > div').forEach(row => {
+      pains.push({
+        value: row.dataset.value,
+        icon: row.querySelector('.pain-icon')?.value.trim() || '📦',
+        title: row.querySelector('.pain-title')?.value.trim() || '',
+        desc: row.querySelector('.pain-desc')?.value.trim() || ''
+      });
+    });
+
+    const currentSystems = [];
+    document.querySelectorAll('#editor-systems-container > div').forEach(row => {
+      currentSystems.push({
+        value: row.dataset.value,
+        title: row.querySelector('.sys-title')?.value.trim() || '',
+        label: row.querySelector('.sys-title')?.value.trim() || ''
+      });
+    });
+
+    const urgencies = [];
+    document.querySelectorAll('#editor-urgencies-container > div').forEach(row => {
+      urgencies.push({
+        value: row.dataset.value,
+        title: row.querySelector('.urg-title')?.value.trim() || '',
+        label: row.querySelector('.urg-title')?.value.trim() || ''
+      });
+    });
+
+    const steps = {
+      step1: {
+        title: getVal('cfg-step1-title'),
+        subtitle: getVal('cfg-step1-subtitle'),
+        questionSegmentLabel: getVal('cfg-step1-q1-label'),
+        segments,
+        questionRevenueLabel: getVal('cfg-step1-q2-label'),
+        revenues
+      },
+      step2: {
+        title: getVal('cfg-step2-title'),
+        subtitle: getVal('cfg-step2-subtitle'),
+        instructionLabel: getVal('cfg-step2-instruction'),
+        pains
+      },
+      step3: {
+        title: getVal('cfg-step3-title'),
+        subtitle: getVal('cfg-step3-subtitle'),
+        questionCurrentSystemLabel: getVal('cfg-step3-q1-label'),
+        currentSystems,
+        questionUrgencyLabel: getVal('cfg-step3-q2-label'),
+        urgencies
+      },
+      step4: {
+        title: getVal('cfg-step4-title'),
+        subtitle: getVal('cfg-step4-subtitle'),
+        nameLabel: getVal('cfg-step4-name-label'),
+        namePlaceholder: getVal('cfg-step4-name-ph'),
+        whatsappLabel: getVal('cfg-step4-zap-label'),
+        whatsappPlaceholder: getVal('cfg-step4-zap-ph'),
+        companyLabel: getVal('cfg-step4-company-label'),
+        companyPlaceholder: getVal('cfg-step4-company-ph'),
+        roleLabel: getVal('cfg-step4-role-label'),
+        rolePlaceholder: getVal('cfg-step4-role-ph'),
+        emailLabel: getVal('cfg-step4-email-label'),
+        emailPlaceholder: getVal('cfg-step4-email-ph'),
+        notesLabel: getVal('cfg-step4-notes-label'),
+        notesPlaceholder: getVal('cfg-step4-notes-ph')
+      }
+    };
+
+    const chkFaq = document.getElementById('cfg-faq-enabled');
+
+    const resultScreen = {
+      offerDesc: getVal('cfg-result-offer-desc'),
+      btnWhatsappText: getVal('cfg-result-btn-whatsapp')
+    };
+
+    const newConfig = {
+      brandName: getVal('cfg-brand-name'),
+      brandTag: getVal('cfg-brand-tag'),
+      badgeText: getVal('cfg-badge-text'),
+      heroTitle: getVal('cfg-hero-title'),
+      heroSubtitle: getVal('cfg-hero-subtitle'),
+      btnStartText: getVal('cfg-btn-start'),
+      heroImage: getVal('cfg-hero-image'),
+      stats,
+      faqEnabled: chkFaq ? chkFaq.checked : true,
+      faqTitle: getVal('cfg-faq-title'),
+      faqSubtitle: getVal('cfg-faq-subtitle'),
+      faqs,
+      steps,
+      resultScreen
+    };
+
+    StorageManager.savePageConfig(newConfig);
+    this.toggleCustomizeModal(false);
+    this.showToast('✅ Tela de captura atualizada com sucesso!');
+  }
+
+  resetCustomizePage() {
+    if (confirm('Tem certeza que deseja restaurar as configurações originais da tela de captura?')) {
+      StorageManager.resetPageConfig();
+      this.populateCustomizeForm();
+      this.showToast('🔄 Configurações da tela de captura restauradas!');
+    }
+  }
+
+  escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

@@ -19,12 +19,16 @@ class DiagnosticApp {
       whatsapp: '',
       company: '',
       role: '',
-      email: ''
+      email: '',
+      notes: ''
     };
 
     this.initElements();
     this.initLayoutTheme();
     this.bindEvents();
+    this.loadPageConfig();
+
+    window.addEventListener('storage', () => this.loadPageConfig());
   }
 
   initElements() {
@@ -133,24 +137,31 @@ class DiagnosticApp {
     this.progressBar.style.width = `${progressPercent}%`;
     this.stepIndicatorText.innerText = `ETAPA ${step} DE 4`;
 
+    const config = StorageManager.getPageConfig();
+    const stepsConfig = config ? config.steps || {} : {};
+
     if (step === 1) {
-      this.stepTitle.innerText = 'Qual é o perfil da sua empresa?';
-      this.stepSubtitle.innerText = 'Selecione seu segmento de atuação e a faixa de faturamento mensal aproximada.';
+      const s1 = stepsConfig.step1 || {};
+      this.stepTitle.innerText = s1.title || 'Qual é o perfil da sua empresa?';
+      this.stepSubtitle.innerText = s1.subtitle || 'Selecione seu segmento de atuação e a faixa de faturamento mensal aproximada.';
       this.btnBack.style.visibility = 'hidden';
       this.btnNext.innerText = 'Próximo Passo ➔';
     } else if (step === 2) {
-      this.stepTitle.innerText = 'Quais são os principais gargalos da sua gestão hoje?';
-      this.stepSubtitle.innerText = 'Selecione todas as opções que geram dor de cabeça na sua operação (pode marcar mais de uma).';
+      const s2 = stepsConfig.step2 || {};
+      this.stepTitle.innerText = s2.title || 'Quais são os principais gargalos da sua gestão hoje?';
+      this.stepSubtitle.innerText = s2.subtitle || 'Selecione todas as opções que geram dor de cabeça na sua operação (pode marcar mais de uma).';
       this.btnBack.style.visibility = 'visible';
       this.btnNext.innerText = 'Próximo Passo ➔';
     } else if (step === 3) {
-      this.stepTitle.innerText = 'Como você controla seu negócio atualmente?';
-      this.stepSubtitle.innerText = 'Indique suas ferramentas atuais e o seu momento de decisão.';
+      const s3 = stepsConfig.step3 || {};
+      this.stepTitle.innerText = s3.title || 'Como você controla seu negócio atualmente?';
+      this.stepSubtitle.innerText = s3.subtitle || 'Indique suas ferramentas atuais e o seu momento de decisão.';
       this.btnBack.style.visibility = 'visible';
       this.btnNext.innerText = 'Ver Diagnóstico ➔';
     } else if (step === 4) {
-      this.stepTitle.innerText = 'Para onde devemos enviar seu Diagnóstico Completo?';
-      this.stepSubtitle.innerText = 'Preencha seus dados para visualizar seu Score de Eficiência e liberar a condição de feira FRESQUA.';
+      const s4 = stepsConfig.step4 || {};
+      this.stepTitle.innerText = s4.title || 'Para onde devemos enviar seu Diagnóstico Completo?';
+      this.stepSubtitle.innerText = s4.subtitle || 'Preencha seus dados para visualizar seu Score de Eficiência e liberar a condição de feira FRESQUA.';
       this.btnBack.style.visibility = 'visible';
       this.btnNext.innerText = 'Gerar Raio-X Agora 🚀';
     }
@@ -199,6 +210,13 @@ class DiagnosticApp {
         return false;
       }
     } else if (step === 4) {
+      this.formData.name = document.getElementById('input-name')?.value.trim() || '';
+      this.formData.whatsapp = document.getElementById('input-whatsapp')?.value.trim() || '';
+      this.formData.company = document.getElementById('input-company')?.value.trim() || '';
+      this.formData.role = document.getElementById('input-role')?.value.trim() || '';
+      this.formData.email = document.getElementById('input-email')?.value.trim() || '';
+      this.formData.notes = document.getElementById('input-notes')?.value.trim() || '';
+
       if (!this.formData.name || !this.formData.whatsapp || !this.formData.company) {
         alert('Por favor, preencha Nome, WhatsApp e Nome da Empresa.');
         return false;
@@ -269,12 +287,16 @@ class DiagnosticApp {
     this.quizCard.style.display = 'none';
     this.resultScreen.style.display = 'block';
 
-    // Update Result UI Elements
-    document.getElementById('result-lead-name').innerText = this.formData.name.split(' ')[0];
-    document.getElementById('result-company-name').innerText = this.formData.company;
-    document.getElementById('result-score-val').innerText = `${finalScore}%`;
-    document.getElementById('result-loss-val').innerText = formattedLoss;
-    document.getElementById('result-hours-val').innerText = formattedHours;
+    // Update Result UI Elements (Safe checks)
+    const setInner = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.innerText = val;
+    };
+    setInner('result-lead-name', this.formData.name.split(' ')[0]);
+    setInner('result-company-name', this.formData.company);
+    setInner('result-score-val', `${finalScore}%`);
+    setInner('result-loss-val', formattedLoss);
+    setInner('result-hours-val', formattedHours);
 
     // Animate Gauge SVG stroke
     const gaugeFill = document.getElementById('gauge-fill-circle');
@@ -331,6 +353,266 @@ class DiagnosticApp {
     this.welcomeScreen.style.display = 'block';
     this.quizCard.style.display = 'none';
     this.resultScreen.style.display = 'none';
+  }
+
+  loadPageConfig() {
+    const config = StorageManager.getPageConfig();
+    if (!config) return;
+
+    // Brand / Logo
+    const brandLogoText = document.getElementById('brand-logo-text');
+    if (brandLogoText && config.brandName) brandLogoText.innerText = config.brandName;
+
+    const brandLogoIcon = document.getElementById('brand-logo-icon');
+    if (brandLogoIcon && config.brandName) brandLogoIcon.innerText = config.brandName.charAt(0).toUpperCase();
+
+    const brandLogoTag = document.getElementById('brand-logo-tag');
+    if (brandLogoTag && config.brandTag) brandLogoTag.innerText = config.brandTag;
+
+    // Badge
+    const heroBadge = document.getElementById('hero-badge');
+    if (heroBadge && config.badgeText) heroBadge.innerText = config.badgeText;
+
+    // Image
+    const heroImgContainer = document.getElementById('hero-img-container');
+    const heroCustomImg = document.getElementById('hero-custom-img');
+    if (heroImgContainer && heroCustomImg) {
+      if (config.heroImage) {
+        heroCustomImg.src = config.heroImage;
+        heroImgContainer.style.display = 'block';
+      } else {
+        heroImgContainer.style.display = 'none';
+      }
+    }
+
+    // Hero Title & Subtitle
+    const heroTitle = document.getElementById('hero-title');
+    if (heroTitle && config.heroTitle) heroTitle.innerHTML = config.heroTitle;
+
+    const heroSubtitle = document.getElementById('hero-subtitle');
+    if (heroSubtitle && config.heroSubtitle) heroSubtitle.innerHTML = config.heroSubtitle;
+
+    // Button
+    const btnStart = document.getElementById('btn-start');
+    if (btnStart && config.btnStartText) btnStart.innerText = config.btnStartText;
+
+    // Stats
+    if (config.stats && Array.isArray(config.stats)) {
+      config.stats.forEach((st, i) => {
+        const numEl = document.getElementById(`stat-num-${i}`);
+        const labelEl = document.getElementById(`stat-label-${i}`);
+        if (numEl && st.number !== undefined) numEl.innerText = st.number;
+        if (labelEl && st.label !== undefined) labelEl.innerText = st.label;
+      });
+    }
+
+    // FAQ Section
+    const faqSection = document.getElementById('client-faq-section');
+    const faqTitle = document.getElementById('client-faq-title');
+    const faqSubtitle = document.getElementById('client-faq-subtitle');
+    const faqAccordion = document.getElementById('client-faq-accordion');
+
+    if (faqSection && faqAccordion) {
+      if (config.faqEnabled && config.faqs && config.faqs.length > 0) {
+        faqSection.style.display = 'block';
+        if (faqTitle && config.faqTitle) faqTitle.innerText = config.faqTitle;
+        if (faqSubtitle && config.faqSubtitle) faqSubtitle.innerText = config.faqSubtitle;
+
+        faqAccordion.innerHTML = '';
+        config.faqs.forEach((item) => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'faq-accordion-item';
+          itemEl.innerHTML = `
+            <div class="faq-accordion-header">
+              <span>${item.question}</span>
+              <span class="faq-accordion-icon">+</span>
+            </div>
+            <div class="faq-accordion-body">
+              <p>${item.answer}</p>
+            </div>
+          `;
+
+          const header = itemEl.querySelector('.faq-accordion-header');
+          header.addEventListener('click', () => {
+            const isActive = itemEl.classList.contains('active');
+            document.querySelectorAll('.faq-accordion-item').forEach(el => el.classList.remove('active'));
+            if (!isActive) itemEl.classList.add('active');
+          });
+
+          faqAccordion.appendChild(itemEl);
+        });
+      } else {
+        faqSection.style.display = 'none';
+      }
+    }
+
+    // Render Steps 1-4 Dynamic Cards
+    if (config.steps) {
+      const s1 = config.steps.step1;
+      if (s1) {
+        const lQ1 = document.getElementById('label-step1-q1');
+        if (lQ1 && s1.questionSegmentLabel) lQ1.innerText = s1.questionSegmentLabel;
+
+        const cSeg = document.getElementById('container-step1-segments');
+        if (cSeg && s1.segments) {
+          cSeg.innerHTML = '';
+          s1.segments.forEach(seg => {
+            const isSel = this.formData.segment === seg.value;
+            const card = document.createElement('div');
+            card.className = `option-card option-single ${isSel ? 'selected' : ''}`;
+            card.dataset.group = 'segment';
+            card.dataset.value = seg.value;
+            card.dataset.label = seg.title || seg.label;
+            card.innerHTML = `
+              <div class="option-icon">${seg.icon || '🛍️'}</div>
+              <div class="option-title">${seg.title || seg.label}</div>
+              ${seg.desc ? `<div class="option-desc">${seg.desc}</div>` : ''}
+            `;
+            cSeg.appendChild(card);
+          });
+        }
+
+        const lQ2 = document.getElementById('label-step1-q2');
+        if (lQ2 && s1.questionRevenueLabel) lQ2.innerText = s1.questionRevenueLabel;
+
+        const cRev = document.getElementById('container-step1-revenues');
+        if (cRev && s1.revenues) {
+          cRev.innerHTML = '';
+          s1.revenues.forEach(rev => {
+            const isSel = this.formData.revenue === rev.value;
+            const card = document.createElement('div');
+            card.className = `option-card option-single ${isSel ? 'selected' : ''}`;
+            card.dataset.group = 'revenue';
+            card.dataset.value = rev.value;
+            card.dataset.label = rev.title || rev.label;
+            card.innerHTML = `<div class="option-title">${rev.title || rev.label}</div>`;
+            cRev.appendChild(card);
+          });
+        }
+      }
+
+      const s2 = config.steps.step2;
+      if (s2) {
+        const lInst = document.getElementById('label-step2-instruction');
+        if (lInst && s2.instructionLabel) lInst.innerText = s2.instructionLabel;
+
+        const cPains = document.getElementById('container-step2-pains');
+        if (cPains && s2.pains) {
+          cPains.innerHTML = '';
+          s2.pains.forEach(p => {
+            const isSel = this.formData.pains.includes(p.value);
+            const card = document.createElement('div');
+            card.className = `option-card option-multi ${isSel ? 'selected' : ''}`;
+            card.dataset.value = p.value;
+            card.innerHTML = `
+              <div class="checkbox-mark">✓</div>
+              <div class="option-icon">${p.icon || '📦'}</div>
+              <div class="option-title">${p.title}</div>
+              ${p.desc ? `<div class="option-desc">${p.desc}</div>` : ''}
+            `;
+            cPains.appendChild(card);
+          });
+        }
+      }
+
+      const s3 = config.steps.step3;
+      if (s3) {
+        const lQ1 = document.getElementById('label-step3-q1');
+        if (lQ1 && s3.questionCurrentSystemLabel) lQ1.innerText = s3.questionCurrentSystemLabel;
+
+        const cSys = document.getElementById('container-step3-systems');
+        if (cSys && s3.currentSystems) {
+          cSys.innerHTML = '';
+          s3.currentSystems.forEach(sys => {
+            const isSel = this.formData.currentSystem === sys.value;
+            const card = document.createElement('div');
+            card.className = `option-card option-single ${isSel ? 'selected' : ''}`;
+            card.dataset.group = 'currentSystem';
+            card.dataset.value = sys.value;
+            card.dataset.label = sys.title || sys.label;
+            card.innerHTML = `<div class="option-title">${sys.title || sys.label}</div>`;
+            cSys.appendChild(card);
+          });
+        }
+
+        const lQ2 = document.getElementById('label-step3-q2');
+        if (lQ2 && s3.questionUrgencyLabel) lQ2.innerText = s3.questionUrgencyLabel;
+
+        const cUrg = document.getElementById('container-step3-urgencies');
+        if (cUrg && s3.urgencies) {
+          cUrg.innerHTML = '';
+          s3.urgencies.forEach(urg => {
+            const isSel = this.formData.urgency === urg.value;
+            const card = document.createElement('div');
+            card.className = `option-card option-single ${isSel ? 'selected' : ''}`;
+            card.dataset.group = 'urgency';
+            card.dataset.value = urg.value;
+            card.dataset.label = urg.title || urg.label;
+            card.innerHTML = `<div class="option-title">${urg.title || urg.label}</div>`;
+            cUrg.appendChild(card);
+          });
+        }
+      }
+
+      const s4 = config.steps.step4;
+      if (s4) {
+        const setLabelPh = (lblId, inputId, labelText, placeholderText) => {
+          const l = document.getElementById(lblId);
+          const i = document.getElementById(inputId);
+          if (l && labelText) l.innerText = labelText;
+          if (i && placeholderText) i.placeholder = placeholderText;
+        };
+
+        setLabelPh('label-step4-name', 'input-name', s4.nameLabel, s4.namePlaceholder);
+        setLabelPh('label-step4-whatsapp', 'input-whatsapp', s4.whatsappLabel, s4.whatsappPlaceholder);
+        setLabelPh('label-step4-company', 'input-company', s4.companyLabel, s4.companyPlaceholder);
+        setLabelPh('label-step4-role', 'input-role', s4.roleLabel, s4.rolePlaceholder);
+        setLabelPh('label-step4-email', 'input-email', s4.emailLabel, s4.emailPlaceholder);
+        setLabelPh('label-step4-notes', 'input-notes', s4.notesLabel, s4.notesPlaceholder);
+      }
+
+      this.bindOptionEvents();
+    }
+
+    // Render Result Screen Configs
+    if (config.resultScreen) {
+      const res = config.resultScreen;
+      const descEl = document.getElementById('result-offer-desc');
+      if (descEl && res.offerDesc !== undefined) descEl.innerText = res.offerDesc;
+
+      const btnEl = document.getElementById('btn-talk-consultant');
+      if (btnEl && res.btnWhatsappText !== undefined) btnEl.innerText = res.btnWhatsappText;
+    }
+  }
+
+  bindOptionEvents() {
+    document.querySelectorAll('.option-single').forEach(card => {
+      card.onclick = () => {
+        const group = card.dataset.group;
+        const value = card.dataset.value;
+        const label = card.dataset.label || card.querySelector('.option-title')?.innerText || '';
+
+        document.querySelectorAll(`.option-single[data-group="${group}"]`).forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+
+        this.formData[group] = value;
+        if (group === 'segment') this.formData.segmentLabel = label;
+        if (group === 'revenue') this.formData.revenueLabel = label;
+      };
+    });
+
+    document.querySelectorAll('.option-multi').forEach(card => {
+      card.onclick = () => {
+        const value = card.dataset.value;
+        card.classList.toggle('selected');
+
+        if (card.classList.contains('selected')) {
+          if (!this.formData.pains.includes(value)) this.formData.pains.push(value);
+        } else {
+          this.formData.pains = this.formData.pains.filter(p => p !== value);
+        }
+      };
+    });
   }
 }
 
