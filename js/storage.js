@@ -195,8 +195,17 @@ export const StorageManager = {
       return sampleLeads;
     }
     try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : sampleLeads;
+      let parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return sampleLeads;
+
+      // Remover automaticamente o lead de teste "Lula da silva" se estiver no cache local
+      const hasLula = parsed.some(l => l.name && l.name.toLowerCase().includes('lula'));
+      if (hasLula) {
+        parsed = parsed.filter(l => !l.name || !l.name.toLowerCase().includes('lula'));
+        this.saveLeads(parsed);
+      }
+
+      return parsed;
     } catch (e) {
       console.error('Erro ao ler banco de dados JSON local:', e);
       return sampleLeads;
@@ -238,17 +247,40 @@ export const StorageManager = {
 
   // Exportar / Baixar arquivo JSON completo (leads.json)
   exportToJSON() {
-    const leads = this.getLeads();
-    const dataStr = JSON.stringify(leads, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `leads_azurraerp_fresqua_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      const leads = this.getLeads();
+      const dataStr = JSON.stringify(leads, null, 2);
+      const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.json`;
+
+      const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 2500);
+    } catch (err) {
+      console.warn('Download via Blob falhou, tentando fallback Data URI:', err);
+      const leads = this.getLeads();
+      const encodedUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(leads, null, 2));
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = encodedUri;
+      fallbackLink.setAttribute('download', 'leads_azurraerp.json');
+      fallbackLink.download = 'leads_azurraerp.json';
+      fallbackLink.style.display = 'none';
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      setTimeout(() => {
+        if (fallbackLink.parentNode) fallbackLink.parentNode.removeChild(fallbackLink);
+      }, 2500);
+    }
   },
 
   // Importar arquivo JSON externo (leads.json) para o banco do navegador

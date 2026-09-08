@@ -141,11 +141,18 @@ export class DashboardController {
       });
     }
 
+    const triggerJsonDownload = () => {
+      StorageManager.exportToJSON();
+      this.showToast('📥 Arquivo JSON de leads baixado com sucesso!');
+    };
+
     if (this.btnDownloadJson) {
-      this.btnDownloadJson.addEventListener('click', () => {
-        StorageManager.exportToJSON();
-        this.showToast('📥 Arquivo JSON de leads baixado com sucesso!');
-      });
+      this.btnDownloadJson.addEventListener('click', triggerJsonDownload);
+    }
+
+    const btnDownloadHeader = document.getElementById('btn-download-json-header');
+    if (btnDownloadHeader) {
+      btnDownloadHeader.addEventListener('click', triggerJsonDownload);
     }
 
     if (this.inputImportJson) {
