@@ -274,6 +274,14 @@ export class DashboardController {
       this.btnSaveCustomizePage.addEventListener('click', () => this.saveCustomizePage());
     }
 
+    const chkHideStatsEl = document.getElementById('cfg-hide-stats');
+    if (chkHideStatsEl) {
+      chkHideStatsEl.addEventListener('change', (e) => {
+        const wrapper = document.getElementById('stats-fields-wrapper');
+        if (wrapper) wrapper.style.opacity = e.target.checked ? '0.4' : '1';
+      });
+    }
+
     if (this.btnResetCustomizePage) {
       this.btnResetCustomizePage.addEventListener('click', () => this.resetCustomizePage());
     }
@@ -516,9 +524,12 @@ export class DashboardController {
     setVal('cfg-btn-start', config.btnStartText);
     setVal('cfg-hero-image', config.heroImage);
 
-    // Stats
-    const chkStats = document.getElementById('cfg-stats-enabled');
-    if (chkStats) chkStats.checked = config.statsEnabled !== false;
+    // Stats (Ocultar / Tirar Estatísticas Hero)
+    const chkHideStats = document.getElementById('cfg-hide-stats');
+    const isStatsHidden = config.hideStats === true || config.statsEnabled === false;
+    if (chkHideStats) chkHideStats.checked = isStatsHidden;
+    const statsFieldsWrapper = document.getElementById('stats-fields-wrapper');
+    if (statsFieldsWrapper) statsFieldsWrapper.style.opacity = isStatsHidden ? '0.4' : '1';
 
     if (config.stats && Array.isArray(config.stats)) {
       config.stats.forEach((st, i) => {
@@ -859,7 +870,8 @@ export class DashboardController {
       }
     };
 
-    const chkStats = document.getElementById('cfg-stats-enabled');
+    const chkHideStats = document.getElementById('cfg-hide-stats');
+    const hideStats = chkHideStats ? chkHideStats.checked : false;
     const chkFaq = document.getElementById('cfg-faq-enabled');
 
     const resultScreen = {
@@ -875,7 +887,8 @@ export class DashboardController {
       heroSubtitle: getVal('cfg-hero-subtitle'),
       btnStartText: getVal('cfg-btn-start'),
       heroImage: getVal('cfg-hero-image'),
-      statsEnabled: chkStats ? chkStats.checked : true,
+      hideStats: hideStats,
+      statsEnabled: !hideStats,
       stats,
       faqEnabled: chkFaq ? chkFaq.checked : true,
       faqTitle: getVal('cfg-faq-title'),

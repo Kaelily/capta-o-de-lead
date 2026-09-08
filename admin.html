@@ -254,13 +254,18 @@
 
         <!-- TAB 2: Estatísticas Hero -->
         <div id="tab-customize-stats" class="customize-tab-content" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 8px; padding: 0.75rem 1rem;">
-            <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; color: var(--text-primary);">
-              <input type="checkbox" id="cfg-stats-enabled" style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
-              Exibir Estatísticas Hero na Tela Inicial
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.95rem; font-weight: 800; cursor: pointer; color: #f87171;">
+              <input type="checkbox" id="cfg-hide-stats" style="width: 22px; height: 22px; accent-color: #ef4444; cursor: pointer;">
+              <span>🚫 Ocultar / Tirar as Estatísticas Hero da Tela Inicial</span>
             </label>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0; padding-left: 2.25rem;">
+              Marque esta opção para <strong>remover completamente</strong> os 3 blocos de destaque (60 seg, +40%, Isenção) da tela inicial do visitante.
+            </p>
           </div>
-          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">Personalize os 3 blocos de destaque exibidos na tela inicial:</p>
+
+          <div id="stats-fields-wrapper">
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">Personalize os 3 blocos de destaque exibidos na tela inicial (caso visíveis):</p>
           
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
             <!-- Stat 1 -->
@@ -291,6 +296,7 @@
             </div>
           </div>
         </div>
+      </div>
 
         <!-- TAB 3: Formulário (Etapas 1 a 4) -->
         <div id="tab-customize-steps" class="customize-tab-content" style="display: none;">

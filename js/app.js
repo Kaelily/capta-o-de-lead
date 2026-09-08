@@ -73,44 +73,44 @@ class DiagnosticApp {
       this.btnNext.addEventListener('click', () => this.handleNext());
     }
 
-    // Option cards selection logic
-    document.querySelectorAll('.option-single').forEach(card => {
-      card.addEventListener('click', () => {
-        const group = card.dataset.group;
-        const value = card.dataset.value;
-        const label = card.dataset.label || card.querySelector('.option-title').innerText;
+    // Option cards selection logic via event delegation (works even after dynamic customization renders)
+    document.addEventListener('click', (e) => {
+      const cardSingle = e.target.closest('.option-single');
+      if (cardSingle) {
+        const group = cardSingle.dataset.group;
+        const value = cardSingle.dataset.value;
+        const titleEl = cardSingle.querySelector('.option-title');
+        const label = cardSingle.dataset.label || (titleEl ? titleEl.innerText : value);
 
         // Deselect sibling cards in same group
         document.querySelectorAll(`.option-single[data-group="${group}"]`).forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
+        cardSingle.classList.add('selected');
 
         this.formData[group] = value;
         if (group === 'segment') this.formData.segmentLabel = label;
         if (group === 'revenue') this.formData.revenueLabel = label;
-      });
-    });
+        return;
+      }
 
-    // Multi-select cards (Pains)
-    document.querySelectorAll('.option-multi').forEach(card => {
-      card.addEventListener('click', () => {
-        const value = card.dataset.value;
-        card.classList.toggle('selected');
+      const cardMulti = e.target.closest('.option-multi');
+      if (cardMulti) {
+        const value = cardMulti.dataset.value;
+        cardMulti.classList.toggle('selected');
 
-        if (card.classList.contains('selected')) {
+        if (cardMulti.classList.contains('selected')) {
           if (!this.formData.pains.includes(value)) this.formData.pains.push(value);
         } else {
           this.formData.pains = this.formData.pains.filter(p => p !== value);
         }
-      });
+        return;
+      }
     });
 
-    // Form inputs handling
-    ['name', 'whatsapp', 'company', 'role', 'email'].forEach(field => {
-      const input = document.getElementById(`input-${field}`);
-      if (input) {
-        input.addEventListener('input', (e) => {
-          this.formData[field] = e.target.value;
-        });
+    // Form inputs handling via event delegation (covers name, whatsapp, company, role, email, notes)
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.id && e.target.id.startsWith('input-')) {
+        const field = e.target.id.replace('input-', '');
+        this.formData[field] = e.target.value;
       }
     });
   }
@@ -397,12 +397,13 @@ class DiagnosticApp {
     if (btnStart && config.btnStartText) btnStart.innerText = config.btnStartText;
 
     // Stats
+    // Stats (Estatísticas Hero)
     const statsContainer = document.querySelector('.hero-stats');
     if (statsContainer) {
-      if (config.statsEnabled === false) {
-        statsContainer.style.display = 'none';
+      if (config.hideStats === true || config.statsEnabled === false) {
+        statsContainer.style.setProperty('display', 'none', 'important');
       } else {
-        statsContainer.style.display = '';
+        statsContainer.style.removeProperty('display');
         if (config.stats && Array.isArray(config.stats)) {
           config.stats.forEach((st, i) => {
             const numEl = document.getElementById(`stat-num-${i}`);
