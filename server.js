@@ -48,9 +48,52 @@ const sqlConfig = {
 
 let poolPromise = null;
 
+async function ensureTableExists(pool) {
+  try {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[leads]') AND type in (N'U'))
+      BEGIN
+          CREATE TABLE [dbo].[leads] (
+              [id] VARCHAR(50) NOT NULL PRIMARY KEY,
+              [timestamp] DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+              [name] NVARCHAR(150) NULL,
+              [company] NVARCHAR(150) NULL,
+              [role] NVARCHAR(100) NULL,
+              [whatsapp] VARCHAR(30) NULL,
+              [email] NVARCHAR(150) NULL,
+              [segment] VARCHAR(50) NULL,
+              [segmentLabel] NVARCHAR(100) NULL,
+              [revenue] VARCHAR(50) NULL,
+              [revenueLabel] NVARCHAR(100) NULL,
+              [pains] NVARCHAR(MAX) NULL,
+              [currentSystem] VARCHAR(50) NULL,
+              [urgency] VARCHAR(50) NULL,
+              [score] INT NULL,
+              [status] VARCHAR(20) NULL,
+              [estimatedMonthlyLoss] NVARCHAR(50) NULL,
+              [estimatedMonthlyHours] NVARCHAR(50) NULL,
+              [notes] NVARCHAR(MAX) NULL,
+              [created_at] DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+              [updated_at] DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
+          );
+      END;
+
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[leads]') AND name = 'notes')
+      BEGIN
+          ALTER TABLE [dbo].[leads] ADD [notes] NVARCHAR(MAX) NULL;
+      END;
+    `);
+  } catch (err) {
+    console.error('Aviso: Não foi possível verificar/criar tabela automática no SQL Server:', err.message);
+  }
+}
+
 async function getPool() {
   if (!poolPromise) {
-    poolPromise = sql.connect(sqlConfig).catch(err => {
+    poolPromise = sql.connect(sqlConfig).then(async (pool) => {
+      await ensureTableExists(pool);
+      return pool;
+    }).catch(err => {
       poolPromise = null;
       throw err;
     });
