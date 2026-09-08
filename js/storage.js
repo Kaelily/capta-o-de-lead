@@ -212,122 +212,46 @@ export const DEFAULT_PAGE_CONFIG = {
   }
 };
 
-const sampleLeads = [
-  {
-    id: 'lead-101',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    name: 'Carlos Alberto Mendonça',
-    company: 'Mendonça Distribuidora de Alimentos',
-    role: 'Sócio-Proprietário',
-    whatsapp: '5511987654321',
-    email: 'carlos@mendoncadistribuidora.com.br',
-    segment: 'distribuicao',
-    segmentLabel: 'Distribuição / Atacado',
-    revenue: '500k_plus',
-    revenueLabel: 'Acima de R$ 500.000/mês',
-    pains: ['estoque', 'fiscal', 'dre', 'vendas'],
-    currentSystem: 'concorrente',
-    urgency: 'imediato',
-    score: 88,
-    status: 'hot',
-    estimatedMonthlyLoss: 'R$ 18.500',
-    estimatedMonthlyHours: '64 hrs',
-    notes: 'Precisa de migração rápida para o próximo mês.'
-  },
-  {
-    id: 'lead-102',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    name: 'Mariana Vasconcelos',
-    company: 'MVR Confecções & Moda',
-    role: 'Diretora Operacional',
-    whatsapp: '5521998877665',
-    email: 'mariana@mvrconfec.com.br',
-    segment: 'industria',
-    segmentLabel: 'Indústria / Manufatura',
-    revenue: '100k_500k',
-    revenueLabel: 'R$ 100.000 a R$ 500.000/mês',
-    pains: ['estoque', 'planilhas', 'fiscal'],
-    currentSystem: 'excel',
-    urgency: '30_dias',
-    score: 76,
-    status: 'hot',
-    estimatedMonthlyLoss: 'R$ 12.200',
-    estimatedMonthlyHours: '48 hrs',
-    notes: 'Interesse especial no módulo de emissão de NF-e rápida.'
-  },
-  {
-    id: 'lead-103',
-    timestamp: new Date(Date.now() - 1000 * 60 * 210).toISOString(),
-    name: 'Fernando Rocha',
-    company: 'TechServices Soluções',
-    role: 'Fundador / CEO',
-    whatsapp: '5531976543210',
-    email: 'fernando@techservices.com.br',
-    segment: 'servicos',
-    segmentLabel: 'Prestação de Serviços',
-    revenue: '30k_100k',
-    revenueLabel: 'R$ 30.000 a R$ 100.000/mês',
-    pains: ['dre', 'planilhas'],
-    currentSystem: 'sem_sistema',
-    urgency: 'imediato',
-    score: 82,
-    status: 'warm',
-    estimatedMonthlyLoss: 'R$ 6.800',
-    estimatedMonthlyHours: '28 hrs',
-    notes: 'Quer ver uma demonstração presencial no stand.'
-  }
-];
+const sampleLeads = [];
 
 export const StorageManager = {
-  // Retorna todos os leads salvos no banco JSON local (LocalStorage)
+  // Retorna todos os leads cadastrados
   getLeads() {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      this.saveLeads(sampleLeads);
-      return sampleLeads;
-    }
+    if (!raw) return [];
     try {
-      let parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return sampleLeads;
-
-      // Remover automaticamente o lead de teste "Lula da silva" se estiver no cache local
-      const hasLula = parsed.some(l => l.name && l.name.toLowerCase().includes('lula'));
-      if (hasLula) {
-        parsed = parsed.filter(l => !l.name || !l.name.toLowerCase().includes('lula'));
-        this.saveLeads(parsed);
-      }
-
-      return parsed;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      console.error('Erro ao ler banco de dados JSON local:', e);
-      return sampleLeads;
+      console.error('Erro ao ler leads:', e);
+      return [];
     }
   },
 
-  // Salvar array de leads no LocalStorage e disparar evento de sincronização em tempo real
+  // Salvar array de leads em cache e disparar sincronização
   saveLeads(leads) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
     window.dispatchEvent(new Event('storage'));
   },
 
-  // Adicionar novo lead (Salva localmente no banco JSON do navegador e envia para Supabase se configurado)
+  // Adicionar novo lead (Envia diretamente para o banco de dados Supabase)
   addLead(leadData) {
     const leads = this.getLeads();
     const filtered = leads.filter(l => l.id !== leadData.id);
     filtered.unshift(leadData);
     this.saveLeads(filtered);
 
-    // Envio assíncrono para o Supabase (se configurado) sem travar a interface
+    // Envio direto para o Supabase
     if (SUPABASE_CONFIG.isConfigured()) {
       this.sendLeadToSupabase(leadData).catch(err => {
-        console.warn('Tentativa de sincronização em segundo plano:', err);
+        console.warn('Erro ao enviar lead para o Supabase:', err);
       });
     }
 
     return leadData;
   },
 
-  // Apagar um lead do banco JSON local e do Supabase se configurado
+  // Apagar lead do Supabase
   deleteLead(leadId) {
     const leads = this.getLeads().filter(l => l.id !== leadId);
     this.saveLeads(leads);
@@ -530,87 +454,9 @@ export const StorageManager = {
     };
   },
 
-  // Limpar todos os leads do banco JSON
+  // Limpar lista local de leads
   clearAllLeads() {
     this.saveLeads([]);
-  },
-
-  // Restaurar leads de demonstração
-  resetSampleLeads() {
-    this.saveLeads(sampleLeads);
-    return sampleLeads;
-  },
-
-  // Exportar / Baixar arquivo JSON completo (leads.json)
-  exportToJSON() {
-    try {
-      const leads = this.getLeads();
-      const dataStr = JSON.stringify(leads, null, 2);
-      const filename = `leads_azurraerp_${new Date().toISOString().slice(0, 10)}.json`;
-
-      const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename);
-      link.download = filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-
-      setTimeout(() => {
-        if (link.parentNode) link.parentNode.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 2500);
-    } catch (err) {
-      console.warn('Download via Blob falhou, tentando fallback Data URI:', err);
-      const leads = this.getLeads();
-      const encodedUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(leads, null, 2));
-      const fallbackLink = document.createElement('a');
-      fallbackLink.href = encodedUri;
-      fallbackLink.setAttribute('download', 'leads_azurraerp.json');
-      fallbackLink.download = 'leads_azurraerp.json';
-      fallbackLink.style.display = 'none';
-      document.body.appendChild(fallbackLink);
-      fallbackLink.click();
-      setTimeout(() => {
-        if (fallbackLink.parentNode) fallbackLink.parentNode.removeChild(fallbackLink);
-      }, 2500);
-    }
-  },
-
-  // Importar arquivo JSON externo (leads.json) para o banco do navegador
-  async importFromJSON(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const importedLeads = JSON.parse(e.target.result);
-          if (!Array.isArray(importedLeads)) {
-            return reject(new Error('O arquivo selecionado não contém uma lista válida de leads.'));
-          }
-
-          // Mesclar com os leads existentes pelo ID
-          const currentLeads = this.getLeads();
-          const map = new Map();
-          currentLeads.forEach(l => map.set(l.id, l));
-          importedLeads.forEach(l => {
-            if (l && l.id) map.set(l.id, l);
-          });
-
-          const merged = Array.from(map.values()).sort(
-            (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
-          );
-
-          this.saveLeads(merged);
-          resolve({ success: true, count: merged.length, added: importedLeads.length });
-        } catch (err) {
-          reject(new Error('Formato JSON inválido: ' + err.message));
-        }
-      };
-      reader.onerror = () => reject(new Error('Erro ao ler o arquivo selecionado.'));
-      reader.readAsText(file);
-    });
   },
 
   // Exportar leads em planilha estruturada compatível nativamente com Microsoft Excel (.xls)

@@ -39,24 +39,15 @@ export class DashboardController {
     this.cloudStatusText = document.getElementById('cloud-status-text');
     this.cloudModal = document.getElementById('cloud-modal');
     this.btnCloseCloudModal = document.getElementById('btn-close-cloud-modal');
-    this.btnDownloadJson = document.getElementById('btn-download-json');
-    this.inputImportJson = document.getElementById('input-import-json');
-    this.btnResetSampleLeads = document.getElementById('btn-reset-sample-leads');
     this.btnClearAllLeads = document.getElementById('btn-clear-all-leads');
     this.toastContainer = document.getElementById('toast-container');
 
     // Supabase DB Modal Elements
-    this.tabBtnSupabase = document.getElementById('tab-btn-supabase');
-    this.tabBtnLocal = document.getElementById('tab-btn-local');
-    this.tabContentSupabase = document.getElementById('tab-content-supabase');
-    this.tabContentLocal = document.getElementById('tab-content-local');
-
     this.inputSupabaseUrl = document.getElementById('input-supabase-url');
     this.inputSupabaseKey = document.getElementById('input-supabase-key');
     this.supabaseStatusPill = document.getElementById('supabase-status-pill');
     this.btnTestSupabase = document.getElementById('btn-test-supabase');
     this.btnSaveSupabase = document.getElementById('btn-save-supabase');
-    this.btnSyncSupabase = document.getElementById('btn-sync-supabase');
     this.btnCopySupabaseSql = document.getElementById('btn-copy-supabase-sql');
 
     this.filterButtons = document.querySelectorAll('.btn-filter-status');
@@ -115,42 +106,26 @@ export class DashboardController {
     }
 
     if (SUPABASE_CONFIG.isConfigured()) {
-      if (this.cloudStatusIndicator) this.cloudStatusIndicator.innerText = '🟢';
+      if (this.cloudStatusIndicator) this.cloudStatusIndicator.innerText = '⚡';
       if (this.cloudStatusText) {
-        this.cloudStatusText.innerText = 'Supabase + Local';
+        this.cloudStatusText.innerText = 'Supabase Conectado';
         this.cloudStatusText.style.color = '#00f2fe';
       }
       if (this.supabaseStatusPill) {
-        this.supabaseStatusPill.innerText = '🟢 Supabase Configurado';
+        this.supabaseStatusPill.innerText = '🟢 Conectado ao Supabase';
         this.supabaseStatusPill.style.background = 'rgba(16, 185, 129, 0.2)';
         this.supabaseStatusPill.style.color = '#10b981';
       }
     } else {
-      if (this.cloudStatusIndicator) this.cloudStatusIndicator.innerText = '📁';
+      if (this.cloudStatusIndicator) this.cloudStatusIndicator.innerText = '⚪';
       if (this.cloudStatusText) {
-        this.cloudStatusText.innerText = 'JSON Local';
-        this.cloudStatusText.style.color = '#10b981';
+        this.cloudStatusText.innerText = 'Supabase Desconectado';
+        this.cloudStatusText.style.color = 'var(--text-secondary)';
       }
       if (this.supabaseStatusPill) {
-        this.supabaseStatusPill.innerText = '⚪ Não configurado (Apenas Local)';
+        this.supabaseStatusPill.innerText = '⚪ Não configurado';
         this.supabaseStatusPill.style.background = 'rgba(148, 163, 184, 0.2)';
         this.supabaseStatusPill.style.color = 'var(--text-secondary)';
-      }
-    }
-  }
-
-  switchDbTab(tabName) {
-    if (this.tabBtnSupabase && this.tabBtnLocal && this.tabContentSupabase && this.tabContentLocal) {
-      if (tabName === 'supabase') {
-        this.tabBtnSupabase.classList.add('active');
-        this.tabBtnLocal.classList.remove('active');
-        this.tabContentSupabase.style.display = 'block';
-        this.tabContentLocal.style.display = 'none';
-      } else {
-        this.tabBtnLocal.classList.add('active');
-        this.tabBtnSupabase.classList.remove('active');
-        this.tabContentLocal.style.display = 'block';
-        this.tabContentSupabase.style.display = 'none';
       }
     }
   }
@@ -309,20 +284,6 @@ export class DashboardController {
       });
     }
 
-    const triggerJsonDownload = () => {
-      StorageManager.exportToJSON();
-      this.showToast('📥 Arquivo JSON de leads baixado com sucesso!');
-    };
-
-    if (this.btnDownloadJson) {
-      this.btnDownloadJson.addEventListener('click', triggerJsonDownload);
-    }
-
-    const btnDownloadHeader = document.getElementById('btn-download-json-header');
-    if (btnDownloadHeader) {
-      btnDownloadHeader.addEventListener('click', triggerJsonDownload);
-    }
-
     const triggerExcelDownload = () => {
       StorageManager.exportToExcel();
       this.showToast('📊 Planilha Excel (.xls) baixada com sucesso!');
@@ -336,35 +297,6 @@ export class DashboardController {
     const btnExportExcelModal = document.getElementById('btn-export-excel-modal');
     if (btnExportExcelModal) {
       btnExportExcelModal.addEventListener('click', triggerExcelDownload);
-    }
-
-    if (this.inputImportJson) {
-      this.inputImportJson.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        try {
-          const res = await StorageManager.importFromJSON(file);
-          this.renderMetrics();
-          this.renderLeadsTable();
-          this.showToast(`✅ ${res.added} leads importados para o banco JSON local!`);
-          this.toggleCloudModal(false);
-        } catch (err) {
-          alert('Erro ao importar arquivo JSON: ' + err.message);
-        } finally {
-          this.inputImportJson.value = '';
-        }
-      });
-    }
-
-    if (this.btnResetSampleLeads) {
-      this.btnResetSampleLeads.addEventListener('click', () => {
-        if (confirm('Deseja restaurar os leads de demonstração no banco JSON?')) {
-          StorageManager.resetSampleLeads();
-          this.renderMetrics();
-          this.renderLeadsTable();
-          this.showToast('🔄 Leads de demonstração restaurados!');
-        }
-      });
     }
 
     if (this.btnClearAllLeads) {

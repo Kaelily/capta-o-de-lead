@@ -1,41 +1,42 @@
 /**
  * AzurraERP Lead Capture - Configurações Gerais da Aplicação
- * Banco de Dados: Híbrido (LocalStorage Offline-First + Supabase Cloud REST API)
+ * Banco de Dados Exclusivo: Supabase Cloud Database (PostgREST API)
  */
 
 const SUPABASE_STORAGE_KEY = 'azurra_supabase_config_v1';
 
+// Credenciais do Supabase (podem ser preenchidas aqui ou no painel admin)
+export const DEFAULT_SUPABASE_CREDENTIALS = {
+  url: '',
+  anonKey: ''
+};
+
 export const SUPABASE_CONFIG = {
-  // Obter credenciais salvas no LocalStorage ou padrão
   getConfig() {
     try {
       const raw = localStorage.getItem(SUPABASE_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
-          url: (parsed.url || '').trim(),
-          anonKey: (parsed.anonKey || '').trim(),
-          autoSync: parsed.autoSync !== false
+          url: (parsed.url || DEFAULT_SUPABASE_CREDENTIALS.url || '').trim(),
+          anonKey: (parsed.anonKey || DEFAULT_SUPABASE_CREDENTIALS.anonKey || '').trim()
         };
       }
     } catch (e) {
       console.warn('Erro ao ler configuração do Supabase:', e);
     }
     return {
-      url: '',
-      anonKey: '',
-      autoSync: true
+      url: DEFAULT_SUPABASE_CREDENTIALS.url,
+      anonKey: DEFAULT_SUPABASE_CREDENTIALS.anonKey
     };
   },
 
-  // Salvar credenciais no navegador
-  saveConfig(url, anonKey, autoSync = true) {
+  saveConfig(url, anonKey) {
     const cleanUrl = (url || '').trim().replace(/\/+$/, '');
     const cleanKey = (anonKey || '').trim();
     const cfg = {
       url: cleanUrl,
-      anonKey: cleanKey,
-      autoSync: !!autoSync
+      anonKey: cleanKey
     };
     localStorage.setItem(SUPABASE_STORAGE_KEY, JSON.stringify(cfg));
     window.dispatchEvent(new CustomEvent('supabase_config_updated', { detail: cfg }));
@@ -57,9 +58,9 @@ export const SUPABASE_CONFIG = {
 };
 
 export const DB_CONFIG = {
-  storageType: 'Híbrido (LocalStorage + Supabase)',
+  storageType: 'Supabase Cloud Database',
   isConfigured() {
-    return true;
+    return SUPABASE_CONFIG.isConfigured();
   }
 };
 

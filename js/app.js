@@ -137,13 +137,13 @@ class DiagnosticApp {
       this.stepTitle.innerText = s3.title || 'Como você controla seu negócio atualmente?';
       this.stepSubtitle.innerText = s3.subtitle || 'Indique suas ferramentas atuais e o seu momento de decisão.';
       this.btnBack.style.visibility = 'visible';
-      this.btnNext.innerText = 'Ver Diagnóstico ➔';
+      this.btnNext.innerText = 'Próximo Passo ➔';
     } else if (step === 4) {
       const s4 = stepsConfig.step4 || {};
       this.stepTitle.innerText = s4.title || 'Para onde devemos enviar seu Diagnóstico Completo?';
-      this.stepSubtitle.innerText = s4.subtitle || 'Preencha seus dados para visualizar seu Score de Eficiência e liberar a condição de feira FRESQUA.';
+      this.stepSubtitle.innerText = s4.subtitle || 'Preencha seus dados para receber o Score de Eficiência e liberar a condição de feira FRESQUA.';
       this.btnBack.style.visibility = 'visible';
-      this.btnNext.innerText = 'Gerar Raio-X Agora 🚀';
+      this.btnNext.innerText = 'Finalizar e Enviar para o Cliente 📲';
     }
   }
 
@@ -151,7 +151,7 @@ class DiagnosticApp {
     if (this.currentStep > 1) {
       this.goToStep(this.currentStep - 1);
     } else {
-      this.resetToWelcome();
+      this.resetForm();
     }
   }
 
@@ -260,42 +260,51 @@ class DiagnosticApp {
       estimatedMonthlyHours: formattedHours
     };
 
-    // Save Lead to LocalStorage
+    // Salvar exclusivamente no banco de dados Supabase
     StorageManager.addLead(leadRecord);
 
-    // Hide Quiz, Show Results
-    this.quizCard.style.display = 'none';
-    this.resultScreen.style.display = 'block';
+    // Gerar link formatado direto para o WhatsApp do CLIENTE
+    const clientWhatsAppUrl = StorageManager.getLeadWhatsAppLink(leadRecord);
 
-    // Update Result UI Elements (Safe checks)
-    const setInner = (id, val) => {
-      const el = document.getElementById(id);
-      if (el) el.innerText = val;
+    // Abrir o WhatsApp do cliente diretamente
+    window.open(clientWhatsAppUrl, '_blank');
+
+    // Limpar o formulário e retornar à tela inicial para o próximo atendimento
+    this.resetForm();
+  }
+
+  resetForm() {
+    this.formData = {
+      segment: '',
+      segmentLabel: '',
+      revenue: '',
+      revenueLabel: '',
+      pains: [],
+      currentSystem: '',
+      urgency: '',
+      name: '',
+      whatsapp: '',
+      company: '',
+      role: '',
+      email: '',
+      notes: ''
     };
-    setInner('result-lead-name', this.formData.name.split(' ')[0]);
-    setInner('result-company-name', this.formData.company);
-    setInner('result-score-val', `${finalScore}%`);
-    setInner('result-loss-val', formattedLoss);
-    setInner('result-hours-val', formattedHours);
 
-    // Animate Gauge SVG stroke
-    const gaugeFill = document.getElementById('gauge-fill-circle');
-    if (gaugeFill) {
-      const circumference = 440;
-      const offset = circumference - (finalScore / 100) * circumference;
-      setTimeout(() => {
-        gaugeFill.style.strokeDashoffset = offset;
-      }, 100);
-    }
+    // Limpar inputs
+    ['name', 'whatsapp', 'company', 'role', 'email', 'notes'].forEach(field => {
+      const input = document.getElementById(`input-${field}`);
+      if (input) input.value = '';
+    });
 
-    // Render Recommended AzurraERP Modules
-    this.renderRecommendedModules(this.formData.pains);
+    // Desmarcar cartões
+    document.querySelectorAll('.option-card.selected').forEach(card => {
+      card.classList.remove('selected');
+    });
 
-    // Setup WhatsApp Link direto para o WhatsApp do CLIENTE cadastrado
-    const btnTalkConsultant = document.getElementById('btn-talk-consultant');
-    if (btnTalkConsultant) {
-      btnTalkConsultant.href = StorageManager.getLeadWhatsAppLink(leadRecord);
-    }
+    // Retornar para a tela inicial
+    this.currentStep = 0;
+    if (this.quizCard) this.quizCard.style.display = 'none';
+    if (this.welcomeScreen) this.welcomeScreen.style.display = 'block';
   }
 
   renderRecommendedModules(pains) {
