@@ -829,7 +829,7 @@ export const StorageManager = {
       ``,
       `Foi um prazer atender voce no nosso Stand na Feira FRESQUA!`,
       ``,
-      `Conforme conversamos, aqui esta o seu *Raio-X de Gestao Empresarial* para a *${company}*:`,
+      `Empresa: ${company}`,
       ``,
       `📊 *Score de Gestao Atual:* ${score}%`,
       `💰 *Economia / Perda Estimada:* ${loss}/mes`,
