@@ -2,8 +2,8 @@
  * AzurraERP Lead Capture - Booth Team Dashboard Controller
  */
 
-import { StorageManager, SUPABASE_SCHEMA_SQL } from './storage.js?v=4.0';
-import { DB_CONFIG, SUPABASE_CONFIG } from './config.js?v=4.0';
+import { StorageManager, SUPABASE_SCHEMA_SQL } from './storage.js?v=4.1';
+import { DB_CONFIG, SUPABASE_CONFIG } from './config.js?v=4.1';
 
 export class DashboardController {
   constructor() {
@@ -142,6 +142,9 @@ export class DashboardController {
     window.addEventListener('supabase_config_updated', () => {
       this.initSupabaseUI();
     });
+
+    // Sincronizar configurações da tela salvas na nuvem Supabase
+    StorageManager.fetchPageConfigFromSupabase().catch(() => {});
   }
 
   bindEvents() {
@@ -906,7 +909,7 @@ export class DashboardController {
     });
   }
 
-  saveCustomizePage() {
+  async saveCustomizePage() {
     const getVal = (id) => {
       const el = document.getElementById(id);
       return el ? el.value.trim() : '';
@@ -1059,9 +1062,9 @@ export class DashboardController {
       resultScreen
     };
 
-    StorageManager.savePageConfig(newConfig);
+    await StorageManager.savePageConfig(newConfig);
     this.toggleCustomizeModal(false);
-    this.showToast('✅ Tela de captura atualizada com sucesso!');
+    this.showToast('✅ Tela de captura atualizada e sincronizada com a nuvem!');
   }
 
   resetCustomizePage() {

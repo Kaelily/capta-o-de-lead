@@ -46,7 +46,18 @@ CREATE POLICY "Permitir deleção de leads" ON public.leads FOR DELETE TO anon, 
 
 CREATE INDEX IF NOT EXISTS idx_leads_timestamp ON public.leads (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON public.leads (status);
-CREATE INDEX IF NOT EXISTS idx_leads_whatsapp ON public.leads (whatsapp);`;
+CREATE INDEX IF NOT EXISTS idx_leads_whatsapp ON public.leads (whatsapp);
+
+CREATE TABLE IF NOT EXISTS public.app_config (
+    id TEXT PRIMARY KEY,
+    config JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir leitura e escrita de config" ON public.app_config;
+CREATE POLICY "Permitir leitura e escrita de config" ON public.app_config FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);`;
 
 export function leadToSupabaseRow(lead) {
   return {
@@ -147,7 +158,7 @@ export const DEFAULT_PAGE_CONFIG = {
   steps: {
     step1: {
       title: 'Qual é o perfil da sua empresa?',
-      subtitle: 'Selecione seu segmento e faixa de faturamento.',
+      subtitle: 'Selecione seu segmento e quantidade de usuários.',
       questionSegmentLabel: '1. Qual o segmento de atuação da sua empresa?',
       segments: [
         { value: 'varejo', label: 'Varejo / Loja Física', title: 'Varejo / Loja Física', desc: 'Comércio direto ao consumidor final', icon: '🛍️' },
@@ -156,12 +167,12 @@ export const DEFAULT_PAGE_CONFIG = {
         { value: 'distribuicao', label: 'Distribuição / Atacado', title: 'Distribuição / Atacado', desc: 'Vendas B2B, grandes volumes e logística', icon: '🚚' },
         { value: 'ecommerce', label: 'E-commerce / Multi-canal', title: 'E-commerce / Digital', desc: 'Vendas online e marketplaces', icon: '🌐' }
       ],
-      questionRevenueLabel: '2. Qual o faturamento bruto mensal aproximado?',
+      questionRevenueLabel: '2. Quantidade de usuários',
       revenues: [
-        { value: 'ate_30k', label: 'Até R$ 30.000/mês', title: 'Até R$ 30.000/mês' },
-        { value: '30k_100k', label: 'R$ 30k a R$ 100k/mês', title: 'R$ 30.000 a R$ 100.000' },
-        { value: '100k_500k', label: 'R$ 100k a R$ 500k/mês', title: 'R$ 100.000 a R$ 500.000' },
-        { value: '500k_plus', label: 'Acima de R$ 500.000/mês', title: 'Acima de R$ 500.000/mês 🌟' }
+        { value: '5', label: '5 usuários', title: '5' },
+        { value: '15', label: '15 usuários', title: '15' },
+        { value: '30', label: '30 usuários', title: '30' },
+        { value: 'acima_30', label: 'Acima de 30 usuários', title: 'Acima de 30' }
       ]
     },
     step2: {
@@ -766,10 +777,64 @@ export const StorageManager = {
     }
   },
 
-  // Salvar configurações personalizadas da tela de captura
-  savePageConfig(config) {
+  // Salvar configurações personalizadas da tela de captura (Local e Nuvem Supabase)
+  async savePageConfig(config) {
     localStorage.setItem(PAGE_CONFIG_KEY, JSON.stringify(config));
     window.dispatchEvent(new Event('storage'));
+
+    // Sincronizar com o Supabase para que todas as máquinas recebam as mesmas configurações
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const url = SUPABASE_CONFIG.getUrl();
+      const key = SUPABASE_CONFIG.getAnonKey();
+      try {
+        await fetch(`${url}/rest/v1/app_config`, {
+          method: 'POST',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            id: 'default_config',
+            config: config,
+            updated_at: new Date().toISOString()
+          })
+        });
+      } catch (err) {
+        console.warn('Aviso: Não foi possível salvar config no Supabase:', err);
+      }
+    }
+  },
+
+  // Buscar configurações da página salvas na nuvem Supabase
+  async fetchPageConfigFromSupabase() {
+    if (!SUPABASE_CONFIG.isConfigured()) return null;
+    const url = SUPABASE_CONFIG.getUrl();
+    const key = SUPABASE_CONFIG.getAnonKey();
+
+    try {
+      const response = await fetch(`${url}/rest/v1/app_config?id=eq.default_config&select=config`, {
+        method: 'GET',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0 && data[0].config) {
+        const remoteConfig = data[0].config;
+        localStorage.setItem(PAGE_CONFIG_KEY, JSON.stringify(remoteConfig));
+        window.dispatchEvent(new Event('storage'));
+        return remoteConfig;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Aviso: Tabela app_config no Supabase não encontrada ou sem conexão:', err);
+      return null;
+    }
   },
 
   // Restaurar padrões de fábrica da tela de captura

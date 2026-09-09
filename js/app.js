@@ -2,7 +2,7 @@
  * AzurraERP Lead Capture & Diagnostic Engine (Client App)
  */
 
-import { StorageManager } from './storage.js?v=4.0';
+import { StorageManager } from './storage.js?v=4.1';
 
 class DiagnosticApp {
   constructor() {
@@ -29,6 +29,13 @@ class DiagnosticApp {
     this.loadPageConfig();
 
     window.addEventListener('storage', () => this.loadPageConfig());
+
+    // Sincronizar configurações atualizadas da nuvem caso existam no Supabase
+    StorageManager.fetchPageConfigFromSupabase().then(remoteCfg => {
+      if (remoteCfg) {
+        this.loadPageConfig();
+      }
+    });
   }
 
   initElements() {
@@ -121,7 +128,7 @@ class DiagnosticApp {
     if (step === 1) {
       const s1 = stepsConfig.step1 || {};
       this.stepTitle.innerText = s1.title || 'Qual é o perfil da sua empresa?';
-      this.stepSubtitle.innerText = s1.subtitle || 'Selecione seu segmento de atuação e a faixa de faturamento mensal aproximada.';
+      this.stepSubtitle.innerText = s1.subtitle || 'Selecione seu segmento de atuação e a quantidade de usuários.';
       this.btnBack.style.visibility = 'hidden';
       this.btnNext.innerText = 'Próximo Passo ➔';
     } else if (step === 2) {
@@ -222,23 +229,24 @@ class DiagnosticApp {
 
     // Temperature / Lead Priority Classification
     let status = 'warm'; // hot, warm, cold
-    if (
-      (this.formData.revenue === '500k_plus' || this.formData.revenue === '100k_500k') &&
-      (this.formData.urgency === 'imediato' || this.formData.urgency === '30_dias')
-    ) {
+    const isLargeCompany = this.formData.revenue === 'acima_30' || this.formData.revenue === '30' || this.formData.revenue === '500k_plus' || this.formData.revenue === '100k_500k';
+    const isSmallCompany = this.formData.revenue === '5' || this.formData.revenue === 'ate_30k';
+
+    if (isLargeCompany && (this.formData.urgency === 'imediato' || this.formData.urgency === '30_dias')) {
       status = 'hot';
-    } else if (this.formData.urgency === 'pesquisando' && this.formData.revenue === 'ate_30k') {
+    } else if (this.formData.urgency === 'pesquisando' && isSmallCompany) {
       status = 'cold';
     } else {
       status = 'warm';
     }
 
     // Calculate Estimated Loss
-    let baseLossVal = 3000;
+    let baseLossVal = 3500;
     let baseHours = 20;
 
-    if (this.formData.revenue === '100k_500k') { baseLossVal = 9500; baseHours = 40; }
-    if (this.formData.revenue === '500k_plus') { baseLossVal = 24000; baseHours = 75; }
+    if (this.formData.revenue === '15') { baseLossVal = 6500; baseHours = 35; }
+    if (this.formData.revenue === '30' || this.formData.revenue === '100k_500k') { baseLossVal = 12000; baseHours = 50; }
+    if (this.formData.revenue === 'acima_30' || this.formData.revenue === '500k_plus') { baseLossVal = 25000; baseHours = 80; }
 
     const lossAmountMultiplier = 1 + (this.formData.pains.length * 0.25);
     const totalLossVal = Math.round(baseLossVal * lossAmountMultiplier);

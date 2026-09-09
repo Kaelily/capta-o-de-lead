@@ -66,3 +66,21 @@ USING (true);
 CREATE INDEX IF NOT EXISTS idx_leads_timestamp ON public.leads (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON public.leads (status);
 CREATE INDEX IF NOT EXISTS idx_leads_whatsapp ON public.leads (whatsapp);
+
+-- 7. Tabela opcional para sincronização de configurações de tela entre múltiplos computadores
+CREATE TABLE IF NOT EXISTS public.app_config (
+    id TEXT PRIMARY KEY,
+    config JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir leitura e escrita de config" ON public.app_config;
+CREATE POLICY "Permitir leitura e escrita de config"
+ON public.app_config
+FOR ALL
+TO anon, authenticated
+USING (true)
+WITH CHECK (true);
+
