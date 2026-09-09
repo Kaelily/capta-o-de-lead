@@ -194,8 +194,8 @@ export const DEFAULT_PAGE_CONFIG = {
       ]
     },
     step4: {
-      title: 'Quase pronto! Onde enviamos seu Raio-X?',
-      subtitle: 'Preencha seus dados de contato para gerar o relatório personalizado.',
+      title: 'Quase pronto! Informações de Contato',
+      subtitle: 'Preencha os dados de contato do cliente para registrar o diagnóstico.',
       nameLabel: 'Seu Nome Completo *',
       namePlaceholder: 'Ex: Roberto Silva',
       whatsappLabel: 'WhatsApp com DDD *',

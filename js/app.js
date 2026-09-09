@@ -141,7 +141,7 @@ class DiagnosticApp {
       this.stepTitle.innerText = s4.title || 'Para onde devemos enviar seu Diagnóstico Completo?';
       this.stepSubtitle.innerText = s4.subtitle || 'Preencha seus dados para receber o Score de Eficiência e liberar a condição de feira FRESQUA.';
       this.btnBack.style.visibility = 'visible';
-      this.btnNext.innerText = 'Finalizar e Enviar para o Cliente 📲';
+      this.btnNext.innerText = 'Finalizar Cadastro ✅';
     }
   }
 
@@ -261,13 +261,8 @@ class DiagnosticApp {
     // Salvar exclusivamente no banco de dados Supabase
     StorageManager.addLead(leadRecord);
 
-    // Gerar link formatado direto para o WhatsApp do CLIENTE
-    const clientWhatsAppUrl = StorageManager.getLeadWhatsAppLink(leadRecord);
-
-    // Abrir o WhatsApp do cliente diretamente
-    window.open(clientWhatsAppUrl, '_blank');
-
-    // Limpar o formulário e retornar à tela inicial para o próximo atendimento
+    // Feedback visual imediato e retorno à tela inicial limpa
+    this.showSuccessToast(leadRecord.name || leadRecord.company || 'Cliente');
     this.resetForm();
   }
 
@@ -339,6 +334,56 @@ class DiagnosticApp {
     this.currentStep = 0;
     if (this.welcomeScreen) this.welcomeScreen.style.display = 'block';
     if (this.quizCard) this.quizCard.style.display = 'none';
+  }
+
+  showSuccessToast(leadName) {
+    let container = document.getElementById('toast-container-app');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container-app';
+      container.style.cssText = `
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        pointer-events: none;
+      `;
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      background: #0f172a;
+      border: 1px solid #10b981;
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+      color: #f8fafc;
+      padding: 14px 22px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideInRight 0.3s ease-out;
+    `;
+    toast.innerHTML = `
+      <span style="font-size: 1.5rem;">✅</span>
+      <div>
+        <div style="font-weight: 700; color: #10b981;">Lead Salvo com Sucesso!</div>
+        <div style="font-size: 0.85rem; color: #94a3b8;">Os dados de <strong>${leadName}</strong> foram gravados diretamente no Supabase.</div>
+      </div>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      setTimeout(() => toast.remove(), 400);
+    }, 4500);
   }
 
   loadPageConfig() {
