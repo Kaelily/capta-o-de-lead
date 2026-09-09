@@ -2,8 +2,8 @@
  * AzurraERP Lead Capture - Booth Team Dashboard Controller
  */
 
-import { StorageManager, SUPABASE_SCHEMA_SQL } from './storage.js';
-import { DB_CONFIG, SUPABASE_CONFIG } from './config.js';
+import { StorageManager, SUPABASE_SCHEMA_SQL } from './storage.js?v=4.0';
+import { DB_CONFIG, SUPABASE_CONFIG } from './config.js?v=4.0';
 
 export class DashboardController {
   constructor() {

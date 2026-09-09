@@ -2,7 +2,7 @@
  * AzurraERP Lead Capture & Diagnostic Engine (Client App)
  */
 
-import { StorageManager } from './storage.js';
+import { StorageManager } from './storage.js?v=4.0';
 
 class DiagnosticApp {
   constructor() {
