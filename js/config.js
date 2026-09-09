@@ -5,10 +5,10 @@
 
 const SUPABASE_STORAGE_KEY = 'azurra_supabase_config_v1';
 
-// Credenciais do Supabase (podem ser preenchidas aqui ou no painel admin)
+// Credenciais oficiais do Supabase (conectam automaticamente todos os computadores e celulares)
 export const DEFAULT_SUPABASE_CREDENTIALS = {
-  url: '',
-  anonKey: ''
+  url: 'https://mahvtncujbosvlhjogen.supabase.co',
+  anonKey: 'sb_publishable_yibVQ2BfCxv6IoivIJQqGQ_ycWDQAj8'
 };
 
 export const SUPABASE_CONFIG = {
@@ -17,10 +17,9 @@ export const SUPABASE_CONFIG = {
       const raw = localStorage.getItem(SUPABASE_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        return {
-          url: (parsed.url || DEFAULT_SUPABASE_CREDENTIALS.url || '').trim(),
-          anonKey: (parsed.anonKey || DEFAULT_SUPABASE_CREDENTIALS.anonKey || '').trim()
-        };
+        const url = (parsed.url || '').trim() || DEFAULT_SUPABASE_CREDENTIALS.url;
+        const anonKey = (parsed.anonKey || '').trim() || DEFAULT_SUPABASE_CREDENTIALS.anonKey;
+        return { url, anonKey };
       }
     } catch (e) {
       console.warn('Erro ao ler configuração do Supabase:', e);

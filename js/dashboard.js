@@ -133,18 +133,25 @@ export class DashboardController {
   }
 
   async initCloudSync() {
-    // Sincronização em tempo real entre abas do navegador
+    // Sincronizar em tempo real quando um lead for adicionado em outra aba
     window.addEventListener('storage', () => {
-      this.renderMetrics();
-      this.renderLeadsTable();
+      this.loadLeadsFromSupabase(false);
     });
 
     window.addEventListener('supabase_config_updated', () => {
       this.initSupabaseUI();
+      this.loadLeadsFromSupabase(false);
     });
 
     // Sincronizar configurações da tela salvas na nuvem Supabase
     StorageManager.fetchPageConfigFromSupabase().catch(() => {});
+
+    // Polling automático a cada 10 segundos para novos leads vindos de outros computadores/celulares
+    setInterval(() => {
+      if (SUPABASE_CONFIG.isConfigured()) {
+        this.loadLeadsFromSupabase(false);
+      }
+    }, 10000);
   }
 
   bindEvents() {
@@ -462,12 +469,12 @@ export class DashboardController {
       return;
     }
 
-    if (this.btnRefreshLeads) {
+    if (isManual && this.btnRefreshLeads) {
       this.btnRefreshLeads.disabled = true;
       this.btnRefreshLeads.innerText = '⏳ Carregando...';
     }
 
-    if (this.leadTableBody) {
+    if (isManual && this.leadTableBody && StorageManager.getLeads().length === 0) {
       this.leadTableBody.innerHTML = `
         <tr>
           <td colspan="7" style="text-align: center; color: var(--accent-cyan); padding: 2.5rem;">

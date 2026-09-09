@@ -257,10 +257,18 @@ export const StorageManager = {
     filtered.unshift(leadData);
     this._cachedLeads = filtered;
 
+    // Disparar sincronização instantânea com abas abertas no mesmo navegador
+    try {
+      localStorage.setItem('azurra_lead_sync_ping', Date.now().toString());
+    } catch (e) {}
+
     // Envio direto e exclusivo para o Supabase
     if (SUPABASE_CONFIG.isConfigured()) {
       try {
-        await this.sendLeadToSupabase(leadData);
+        const res = await this.sendLeadToSupabase(leadData);
+        if (!res.success) {
+          console.error('Falha ao enviar lead para o Supabase:', res.error);
+        }
       } catch (err) {
         console.warn('Erro ao enviar lead para o Supabase:', err);
       }
