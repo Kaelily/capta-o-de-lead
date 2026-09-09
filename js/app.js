@@ -2,7 +2,7 @@
  * AzurraERP Lead Capture & Diagnostic Engine (Client App)
  */
 
-import { StorageManager } from './storage.js?v=4.1';
+import { StorageManager } from './storage.js?v=4.2';
 
 class DiagnosticApp {
   constructor() {
@@ -210,7 +210,7 @@ class DiagnosticApp {
     return true;
   }
 
-  calculateAndShowResult() {
+  async calculateAndShowResult() {
     // Qualification Logic & Scoring System
     let baseScore = 100;
     
@@ -267,10 +267,15 @@ class DiagnosticApp {
     };
 
     // Salvar exclusivamente no banco de dados Supabase
-    StorageManager.addLead(leadRecord);
+    try {
+      await StorageManager.addLead(leadRecord);
+      this.showSuccessToast(leadRecord.name || leadRecord.company || 'Cliente');
+    } catch (err) {
+      console.error('Erro ao salvar lead:', err);
+      alert('Aviso ao salvar lead: ' + err.message);
+    }
 
-    // Feedback visual imediato e retorno à tela inicial limpa
-    this.showSuccessToast(leadRecord.name || leadRecord.company || 'Cliente');
+    // Retorno à tela inicial limpa
     this.resetForm();
   }
 

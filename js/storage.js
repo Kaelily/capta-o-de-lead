@@ -4,7 +4,7 @@
  * Feira FRESQUA 2026
  */
 
-import { DB_CONFIG, SUPABASE_CONFIG } from './config.js';
+import { DB_CONFIG, SUPABASE_CONFIG } from './config.js?v=4.2';
 
 export const SUPABASE_SCHEMA_SQL = `-- Script SQL para Supabase — AzurraERP Lead Capture (Feira FRESQUA 2026)
 CREATE TABLE IF NOT EXISTS public.leads (
